@@ -28,11 +28,7 @@ jobs:
 
       - name: Prepare Android SDK
         run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
-          fi
-          echo "SDKMANAGER=$SDKMANAGER"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
           yes | "$SDKMANAGER" --licenses || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
 
@@ -44,6 +40,19 @@ jobs:
 
       - name: Unpack project
         run: unzip -q LMP_Clock_Weather_Project.zip -d .
+
+      - name: Fix Android manifest XML
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("LMPClockWeather/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = s.replace('LMP Clock & Weather', 'LMP Clock &amp; Weather')
+          p.write_text(s)
+          import xml.etree.ElementTree as ET
+          ET.parse(p)
+          print("AndroidManifest.xml: XML OK")
+          PY
 
       - name: Build APK
         run: gradle --no-daemon -p LMPClockWeather :app:assembleDebug
