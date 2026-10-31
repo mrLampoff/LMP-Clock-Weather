@@ -4,16 +4,18 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'LMP_Clock_Weather_Project.zip'
-      - '.github/workflows/android.yml'
 
 permissions:
   contents: read
 
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,26 +26,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Prepare Android SDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          fi
+          echo "SDKMANAGER=$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Install Android SDK 35
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Gradle 8.9
+        run: |
+          curl -L https://services.gradle.org/distributions/gradle-8.9-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.9/bin" >> "$GITHUB_PATH"
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Unpack Android project
+      - name: Unpack project
         run: unzip -q LMP_Clock_Weather_Project.zip -d .
 
-      - name: Build debug APK
+      - name: Build APK
         run: gradle --no-daemon -p LMPClockWeather :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LMP-Clock-Weather-debug-APK
+          name: LMP-Clock-Weather-APK
           path: LMPClockWeather/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
