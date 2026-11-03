@@ -38,28 +38,25 @@ jobs:
           unzip -q gradle.zip
           echo "$GITHUB_WORKSPACE/gradle-8.9/bin" >> "$GITHUB_PATH"
 
-      - name: Unpack project
-        run: unzip -q LMP_Clock_Weather_Project.zip -d .
-
       - name: Fix Android manifest XML
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path("LMPClockWeather/app/src/main/AndroidManifest.xml")
+          import xml.etree.ElementTree as ET
+          p = Path("app/src/main/AndroidManifest.xml")
           s = p.read_text()
           s = s.replace('LMP Clock & Weather', 'LMP Clock &amp; Weather')
           p.write_text(s)
-          import xml.etree.ElementTree as ET
           ET.parse(p)
           print("AndroidManifest.xml: XML OK")
           PY
 
       - name: Build APK
-        run: gradle --no-daemon -p LMPClockWeather :app:assembleDebug
+        run: gradle --no-daemon :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: LMP-Clock-Weather-APK
-          path: LMPClockWeather/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
