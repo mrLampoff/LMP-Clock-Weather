@@ -104,11 +104,21 @@ class WeatherLocationService : Service() {
     }
 
     private fun hasLocationPermission(): Boolean {
-        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+    val fineGranted =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
-    }
+
+    val coarseGranted =
+        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    val backgroundGranted =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+        checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    return (fineGranted || coarseGranted) && backgroundGranted
+}
 
     private fun getLastLocation() {
         if (!hasLocationPermission()) return
