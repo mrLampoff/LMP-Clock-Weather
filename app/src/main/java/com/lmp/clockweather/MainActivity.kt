@@ -2,10 +2,16 @@ package com.lmp.clockweather
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.location.Geocoder
+import android.net.Uri
+import android.provider.Settings
 import android.os.Bundle
+import android.os.Build
+import android.app.Activity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -75,6 +81,10 @@ data class WeatherBundle(val now: WeatherNow, val days: List<DayForecast>)
 @Composable
 fun LmpWeatherApp() {
     val context = LocalContext.current
+    val notificationPermissionLauncher =
+    rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
     val scope = rememberCoroutineScope()
     var weather by remember { mutableStateOf<WeatherBundle?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -83,30 +93,89 @@ fun LmpWeatherApp() {
     var useCelsius by remember { mutableStateOf(true) }
     var locationName by remember { mutableStateOf("Київ") }
 
-    fun load(lat: Double = 50.4501, lon: Double = 30.5234, city: String = "Київ") {
+       fun load(lat: Double = 50.4501, lon: Double = 30.5234, city: String = "Київ") {
         scope.launch {
             loading = true
             error = ""
             try {
-                val result = withContext(Dispatchers.IO) { fetchWeather(lat, lon, city) }
+                val result = withContext(Dispatchers.IO) {
+                    fetchWeather(lat, lon, city)
+                }
                 weather = result
                 locationName = city
             } catch (e: Exception) {
                 error = "Не вдалося отримати погоду. Перевір підключення до інтернету."
-            } finally { loading = false }
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    fun loadMyLocation() {
+    val serviceIntent = Intent(context, WeatherLocationService::class.java)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(serviceIntent)
+    } else {
+        context.startService(serviceIntent)
+    }
+
+    val loc = getLastKnownLocation(context)
+        if (loc != null) {
+            scope.launch {
+                val city = withContext(Dispatchers.IO) {
+                    getCityName(context, loc.latitude, loc.longitude)
+                }
+                load(loc.latitude, loc.longitude, city)
+            }
+        } else {
+            load()
         }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true || grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
-            val loc = getLastKnownLocation(context)
-            if (loc != null) load(loc.latitude, loc.longitude, "Моє місцезнаходження") else load()
-        } else load()
+        if (
+            grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        ) {
+            loadMyLocation()
+        } else {
+            load()
+        }
     }
 
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(Unit) {
+
+    if (
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) {
+        notificationPermissionLauncher.launch(
+            Manifest.permission.POST_NOTIFICATIONS
+        )
+    }
+
+    val fineGranted = context.checkSelfPermission(
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val coarseGranted = context.checkSelfPermission(
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    if (fineGranted || coarseGranted) {
+        loadMyLocation()
+    } else {
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        )
+    }
+}
 
     if (showSettings) {
         SettingsScreen(
@@ -124,8 +193,38 @@ fun LmpWeatherApp() {
             onRefresh = { load() },
             onSettings = { showSettings = true },
             onLocation = {
-                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
-            }
+    val fineGranted = context.checkSelfPermission(
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val coarseGranted = context.checkSelfPermission(
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    if (fineGranted || coarseGranted) {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            context.checkSelfPermission(
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${context.packageName}")
+            )
+            context.startActivity(intent)
+        } else {
+            loadMyLocation()
+        }
+    } else {
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        )
+    }
+}
         )
     }
 }
@@ -290,4 +389,17 @@ private fun weatherDescription(code: Int): String = when (code) {
     45, 48 -> "Туман"; 51, 53, 55 -> "Мряка"; 61, 63, 65 -> "Дощ"
     71, 73, 75 -> "Сніг"; 80, 81, 82 -> "Зливи"; 95, 96, 99 -> "Гроза"
     else -> "Змінна погода"
+}
+private fun getCityName(context: Context, latitude: Double, longitude: Double): String {
+    return try {
+        val geocoder = Geocoder(context, Locale("uk", "UA"))
+        val address = geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull()
+
+        address?.locality
+            ?: address?.subAdminArea
+            ?: address?.adminArea
+            ?: "Моє місцезнаходження"
+    } catch (e: Exception) {
+        "Моє місцезнаходження"
+    }
 }
