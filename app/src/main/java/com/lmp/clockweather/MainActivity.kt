@@ -81,35 +81,54 @@ data class WeatherBundle(val now: WeatherNow, val days: List<DayForecast>)
 @Composable
 fun LmpWeatherApp() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var notificationChecked by remember {
         mutableStateOf(false)
     }
 
-    val notificationPermissionLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) {
-            notificationChecked = true
-        }
-    val scope = rememberCoroutineScope()
-    var weather by remember { mutableStateOf<WeatherBundle?>(null) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf("") }
-    var showSettings by remember { mutableStateOf(false) }
-    var useCelsius by remember { mutableStateOf(true) }
-    var locationName by remember { mutableStateOf("Київ") }
+    var weather by remember {
+        mutableStateOf<WeatherBundle?>(null)
+    }
 
-       fun load(lat: Double = 50.4501, lon: Double = 30.5234, city: String = "Київ") {
+    var loading by remember {
+        mutableStateOf(false)
+    }
+
+    var error by remember {
+        mutableStateOf("")
+    }
+
+    var showSettings by remember {
+        mutableStateOf(false)
+    }
+
+    var useCelsius by remember {
+        mutableStateOf(true)
+    }
+
+    var locationName by remember {
+        mutableStateOf("Київ")
+    }
+
+    // Завантаження погоди
+    fun load(
+        lat: Double = 50.4501,
+        lon: Double = 30.5234,
+        city: String = "Київ"
+    ) {
         scope.launch {
             loading = true
             error = ""
+
             try {
                 val result = withContext(Dispatchers.IO) {
                     fetchWeather(lat, lon, city)
                 }
+
                 weather = result
                 locationName = city
+
             } catch (e: Exception) {
                 error = "Не вдалося отримати погоду. Перевір підключення до інтернету."
             } finally {
@@ -118,161 +137,244 @@ fun LmpWeatherApp() {
         }
     }
 
+    // Запуск фонового сервісу та завантаження погоди
+    fun startServiceAndLoad() {
+        val serviceIntent = Intent(
+            context,
+            WeatherLocationService::class.java
+        )
 
-fun startServiceAndLoad() {
-    val serviceIntent = Intent(context, WeatherLocationService::class.java)
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(serviceIntent)
-    } else {
-        context.startService(serviceIntent)
-    }
-
-    val loc = getLastKnownLocation(context)
-
-    if (loc != null) {
-        scope.launch {
-            val city = withContext(Dispatchers.IO) {
-                getCityName(context, loc.latitude, loc.longitude)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
             }
-            load(loc.latitude, loc.longitude, city)
+        } catch (e: Exception) {
+            error = "Не вдалося запустити фонове оновлення погоди."
         }
-    } else {
-        load()
-    }
-}
 
-   
-val backgroundSettingsLauncher =
-    rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
+        val loc = getLastKnownLocation(context)
+
+        if (loc != null) {
+            scope.launch {
+                val city = withContext(Dispatchers.IO) {
+                    getCityName(
+                        context,
+                        loc.latitude,
+                        loc.longitude
+                    )
+                }
+
+                load(
+                    loc.latitude,
+                    loc.longitude,
+                    city
+                )
+            }
+        } else {
+            load()
+        }
+    }
+
+    // Дозвіл на доступ до місцезнаходження у фоні через налаштування
+    val backgroundSettingsLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) {
+            val backgroundGranted =
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                context.checkSelfPermission(
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+
+            if (backgroundGranted) {
+                startServiceAndLoad()
+            } else {
+                load()
+            }
+        }
+
+    // Запит фонового доступу для Android 10
+    val backgroundPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                startServiceAndLoad()
+            } else {
+                load()
+            }
+        }
+
+    // Запит дозволу на звичайне місцезнаходження
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { grants ->
+
+            val locationGranted =
+                grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+            if (locationGranted) {
+
+                val backgroundGranted =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                    context.checkSelfPermission(
+                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                if (!backgroundGranted) {
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+                        val intent = Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:${context.packageName}")
+                        )
+
+                        backgroundSettingsLauncher.launch(intent)
+
+                    } else {
+
+                        backgroundPermissionLauncher.launch(
+                            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                        )
+                    }
+
+                } else {
+                    startServiceAndLoad()
+                }
+
+            } else {
+                load()
+            }
+        }
+
+    // Перевірка всіх дозволів і запуск потрібного сценарію
+    fun ensureBackgroundAndStart() {
+
+        val fineGranted =
+            context.checkSelfPermission(
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        val coarseGranted =
+            context.checkSelfPermission(
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (!fineGranted && !coarseGranted) {
+
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+            )
+
+            return
+        }
+
         val backgroundGranted =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
             context.checkSelfPermission(
                 Manifest.permission.ACCESS_BACKGROUND_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
 
-        if (backgroundGranted) {
-            startServiceAndLoad()
+        if (!backgroundGranted) {
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+                val intent = Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:${context.packageName}")
+                )
+
+                backgroundSettingsLauncher.launch(intent)
+
+            } else {
+
+                backgroundPermissionLauncher.launch(
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                )
+            }
+
+            return
+        }
+
+        startServiceAndLoad()
+    }
+
+    // Запит дозволу на сповіщення
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) {
+            notificationChecked = true
+        }
+
+    // Перший запуск: перевіряємо дозвіл на сповіщення
+    LaunchedEffect(Unit) {
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+
+            notificationPermissionLauncher.launch(
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+
         } else {
-            load()
+            notificationChecked = true
         }
     }
 
-val backgroundPermissionLauncher =
-    rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            startServiceAndLoad()
-        } else {
-            load()
-        }
-    }
+    // Після перевірки сповіщень запускаємо перевірку геолокації
+    LaunchedEffect(notificationChecked) {
 
-val locationPermissionLauncher =
-    rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { grants ->
-        val locationGranted =
-            grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-
-        if (locationGranted) {
+        if (notificationChecked) {
             ensureBackgroundAndStart()
-        } else {
-            load()
         }
     }
 
-
-fun ensureBackgroundAndStart() {
-    val fineGranted =
-        context.checkSelfPermission(
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-    val coarseGranted =
-        context.checkSelfPermission(
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-    if (!fineGranted && !coarseGranted) {
-        locationPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        )
-        return
-    }
-
-    if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-        context.checkSelfPermission(
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION
-        ) != PackageManager.PERMISSION_GRANTED
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val intent = Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:${context.packageName}")
-            )
-            backgroundSettingsLauncher.launch(intent)
-        } else {
-            backgroundPermissionLauncher.launch(
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-            )
-        }
-        return
-    }
-
-    startServiceAndLoad()
-}
-
-    
-LaunchedEffect(Unit) {
-    if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-        context.checkSelfPermission(
-            Manifest.permission.POST_NOTIFICATIONS
-        ) != PackageManager.PERMISSION_GRANTED
-    ) {
-        notificationPermissionLauncher.launch(
-            Manifest.permission.POST_NOTIFICATIONS
-        )
-    } else {
-        notificationChecked = true
-    }
-}
-
-LaunchedEffect(notificationChecked) {
-    if (notificationChecked) {
-        ensureBackgroundAndStart()
-    }
-}
-
+    // Відображення екранів
     if (showSettings) {
+
         SettingsScreen(
             useCelsius = useCelsius,
-            onCelsiusChange = { useCelsius = it },
-            onBack = { showSettings = false }
+            onCelsiusChange = {
+                useCelsius = it
+            },
+            onBack = {
+                showSettings = false
+            }
         )
+
     } else {
+
         MainWeatherScreen(
             weather = weather,
             loading = loading,
             error = error,
             locationName = locationName,
             useCelsius = useCelsius,
-            onRefresh = { load() },
-            onSettings = { showSettings = true },
-          
-onLocation = {
-    ensureBackgroundAndStart()
+            onRefresh = {
+                load()
+            },
+            onSettings = {
+                showSettings = true
+            },
+            onLocation = {
+                ensureBackgroundAndStart()
+            }
+        )
+    }
 }
-
 
 @Composable
 fun MainWeatherScreen(
