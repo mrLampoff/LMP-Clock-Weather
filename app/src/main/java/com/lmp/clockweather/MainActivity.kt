@@ -81,10 +81,17 @@ data class WeatherBundle(val now: WeatherNow, val days: List<DayForecast>)
 @Composable
 fun LmpWeatherApp() {
     val context = LocalContext.current
+
+    var notificationChecked by remember {
+        mutableStateOf(false)
+    }
+
     val notificationPermissionLauncher =
-    rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { }
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) {
+            notificationChecked = true
+        }
     val scope = rememberCoroutineScope()
     var weather by remember { mutableStateOf<WeatherBundle?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -111,7 +118,8 @@ fun LmpWeatherApp() {
         }
     }
 
-    fun loadMyLocation() {
+
+fun startServiceAndLoad() {
     val serviceIntent = Intent(context, WeatherLocationService::class.java)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -121,59 +129,127 @@ fun LmpWeatherApp() {
     }
 
     val loc = getLastKnownLocation(context)
-        if (loc != null) {
-            scope.launch {
-                val city = withContext(Dispatchers.IO) {
-                    getCityName(context, loc.latitude, loc.longitude)
-                }
-                load(loc.latitude, loc.longitude, city)
+
+    if (loc != null) {
+        scope.launch {
+            val city = withContext(Dispatchers.IO) {
+                getCityName(context, loc.latitude, loc.longitude)
             }
+            load(loc.latitude, loc.longitude, city)
+        }
+    } else {
+        load()
+    }
+}
+
+   
+val backgroundSettingsLauncher =
+    rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val backgroundGranted =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            context.checkSelfPermission(
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (backgroundGranted) {
+            startServiceAndLoad()
         } else {
             load()
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+val backgroundPermissionLauncher =
+    rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startServiceAndLoad()
+        } else {
+            load()
+        }
+    }
+
+val locationPermissionLauncher =
+    rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        if (
+        val locationGranted =
             grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        ) {
-            loadMyLocation()
+
+        if (locationGranted) {
+            ensureBackgroundAndStart()
         } else {
             load()
         }
     }
 
-    LaunchedEffect(Unit) {
 
-    if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-    ) {
-        notificationPermissionLauncher.launch(
-            Manifest.permission.POST_NOTIFICATIONS
-        )
-    }
+fun ensureBackgroundAndStart() {
+    val fineGranted =
+        context.checkSelfPermission(
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-    val fineGranted = context.checkSelfPermission(
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
+    val coarseGranted =
+        context.checkSelfPermission(
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-    val coarseGranted = context.checkSelfPermission(
-        Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    if (fineGranted || coarseGranted) {
-        loadMyLocation()
-    } else {
-        permissionLauncher.launch(
+    if (!fineGranted && !coarseGranted) {
+        locationPermissionLauncher.launch(
             arrayOf(
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.ACCESS_FINE_LOCATION
             )
         )
+        return
+    }
+
+    if (
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+        context.checkSelfPermission(
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${context.packageName}")
+            )
+            backgroundSettingsLauncher.launch(intent)
+        } else {
+            backgroundPermissionLauncher.launch(
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            )
+        }
+        return
+    }
+
+    startServiceAndLoad()
+}
+
+    
+LaunchedEffect(Unit) {
+    if (
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        context.checkSelfPermission(
+            Manifest.permission.POST_NOTIFICATIONS
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        notificationPermissionLauncher.launch(
+            Manifest.permission.POST_NOTIFICATIONS
+        )
+    } else {
+        notificationChecked = true
+    }
+}
+
+LaunchedEffect(notificationChecked) {
+    if (notificationChecked) {
+        ensureBackgroundAndStart()
     }
 }
 
@@ -192,42 +268,11 @@ fun LmpWeatherApp() {
             useCelsius = useCelsius,
             onRefresh = { load() },
             onSettings = { showSettings = true },
-            onLocation = {
-    val fineGranted = context.checkSelfPermission(
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    val coarseGranted = context.checkSelfPermission(
-        Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    if (fineGranted || coarseGranted) {
-        if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            context.checkSelfPermission(
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            val intent = Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:${context.packageName}")
-            )
-            context.startActivity(intent)
-        } else {
-            loadMyLocation()
-        }
-    } else {
-        permissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        )
-    }
+          
+onLocation = {
+    ensureBackgroundAndStart()
 }
-        )
-    }
-}
+
 
 @Composable
 fun MainWeatherScreen(
