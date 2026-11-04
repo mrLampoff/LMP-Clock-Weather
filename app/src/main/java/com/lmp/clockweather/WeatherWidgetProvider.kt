@@ -200,9 +200,9 @@ class WeatherWidgetProvider : AppWidgetProvider() {
             }
 
             // Годинник -> список будильників.
-            val alarmIntent = Intent(
-                AlarmClock.ACTION_SHOW_ALARMS
-            )
+            val alarmIntent = context.packageManager
+    .getLaunchIntentForPackage("com.sec.android.app.clockpackage")
+    ?: Intent(AlarmClock.ACTION_SET_ALARM)
 
             views.setOnClickPendingIntent(
                 R.id.widget_clock_area,
