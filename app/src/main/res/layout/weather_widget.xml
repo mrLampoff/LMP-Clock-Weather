@@ -1,34 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/widget_background"
-    android:gravity="center_vertical">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextClock
-                android:id="@+id/widget_clock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:format12Hour="HH:mm"
-                android:format24Hour="HH:mm"
-                android:textColor="#FFFFF8EF"
+                android:textColor="#FFFFFFFF"
                 android:textSize="38sp"
                 android:fontFamily="sans"
+                android:fontWeight="300"
                 android:letterSpacing="-0.04" />
 
             <TextClock
@@ -37,51 +10,97 @@
                 android:layout_height="wrap_content"
                 android:format12Hour="EEEE, d MMMM"
                 android:format24Hour="EEEE, d MMMM"
-                android:textColor="#D9FFFFFF"
-                android:textSize="12sp" />
+                android:textColor="#E6FFFFFF"
+                android:textSize="11sp"
+                android:maxLines="1" />
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/widget_city_area"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:text="Київ"
-                android:textColor="#FFFFF8EF"
-                android:textSize="12sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="●"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="8sp" />
+
+                <TextView
+                    android:id="@+id/widget_city"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:text="Київ"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_icon"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🌤️"
-            android:textSize="34sp"
-            android:gravity="center" />
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="12dp"
+            android:background="#55FFFFFF" />
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:id="@+id/widget_weather_area"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical|end"
             android:orientation="vertical"
-            android:gravity="end"
-            android:layout_marginStart="8dp">
+            android:clickable="true"
+            android:focusable="true">
 
-            <TextView
-                android:id="@+id/widget_temperature"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="—°"
-                android:textColor="#FFFFF8EF"
-                android:textSize="34sp"
-                android:fontFamily="sans"
-                android:fontWeight="300" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/widget_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="7dp"
+                    android:text="🌤️"
+                    android:textSize="29sp" />
+
+                <TextView
+                    android:id="@+id/widget_temperature"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="—°"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="36sp"
+                    android:fontFamily="sans"
+                    android:fontWeight="300" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/widget_high_low"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="Макс. —°  ·  Мін. —°"
+                android:textColor="#E6FFFFFF"
+                android:textSize="10sp" />
 
             <TextView
                 android:id="@+id/widget_weather"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Погода"
-                android:textColor="#D9FFFFFF"
+                android:layout_marginTop="3dp"
+                android:text="Завантажуємо погоду…"
+                android:textColor="#FFFFFFFF"
                 android:textSize="11sp"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
