@@ -1,4 +1,3 @@
-
 package com.lmp.clockweather
 
 import android.Manifest
@@ -193,6 +192,9 @@ class WeatherLocationService : Service() {
                     .getDouble(0).toInt()
                 val low = daily.getJSONArray("temperature_2m_min")
                     .getDouble(0).toInt()
+
+                // Share the same location with the home-screen widget.
+                LocationStore.save(this, location.latitude, location.longitude, city)
 
                 handler.post {
                     currentCity = city
