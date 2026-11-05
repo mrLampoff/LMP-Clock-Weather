@@ -94,9 +94,17 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.widget_high_low, highLow)
             }
 
-            // Clock tap -> Samsung/system alarm list.
-            val alarmIntent = Intent(AlarmClock.ACTION_SHOW_ALARMS)
-            val alarmPending = activityPendingIntent(context, alarmIntent, id * 10 + 1)
+           // Clock tap -> Samsung Clock app.
+            val alarmIntent = context.packageManager
+                .getLaunchIntentForPackage("com.sec.android.app.clockpackage")
+                ?: Intent(AlarmClock.ACTION_SHOW_ALARMS)
+
+            val alarmPending = activityPendingIntent(
+                context,
+                alarmIntent,
+                id * 10 + 1
+            )
+
             views.setOnClickPendingIntent(R.id.widget_clock_area, alarmPending)
 
             // Date tap -> default calendar application.
