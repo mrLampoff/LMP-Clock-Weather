@@ -95,7 +95,9 @@ class WeatherWidgetProvider : AppWidgetProvider() {
             }
 
            // Clock tap -> Samsung/system alarm list.
-            val alarmIntent = Intent(AlarmClock.ACTION_SET_ALARM)
+            val alarmIntent = Intent(context, MainActivity::class.java).apply {
+    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val alarmPending = PendingIntent.getActivity(
                 context,
                 id * 10 + 1,
@@ -253,7 +255,9 @@ class WidgetWeatherWorker(context: Context, params: WorkerParameters) :
         val alarmPending = PendingIntent.getActivity(
             applicationContext,
             appWidgetId * 10 + 1,
-           Intent(AlarmClock.ACTION_SET_ALARM),
+            Intent(applicationContext, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_clock_area, alarmPending)
