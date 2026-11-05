@@ -166,6 +166,8 @@ fun LmpWeatherApp() {
                     )
                 }
 
+                // Save the exact same coordinates and city for the widget.
+                LocationStore.save(context, loc.latitude, loc.longitude, city)
                 load(
                     loc.latitude,
                     loc.longitude,
@@ -364,7 +366,13 @@ fun LmpWeatherApp() {
             locationName = locationName,
             useCelsius = useCelsius,
             onRefresh = {
-                load()
+                // Refresh using the last detected location instead of silently reverting to Kyiv.
+                val saved = LocationStore.get(context)
+                if (saved != null) {
+                    load(saved.latitude, saved.longitude, saved.city)
+                } else {
+                    startServiceAndLoad()
+                }
             },
             onSettings = {
                 showSettings = true
