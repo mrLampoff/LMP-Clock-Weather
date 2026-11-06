@@ -142,22 +142,42 @@ class WeatherLocationService : Service() {
     private fun updateWeather(location: Location) {
         thread {
             try {
-                val city = try {
-                    val geocoder = Geocoder(this, Locale("uk", "UA"))
-                    @Suppress("DEPRECATION")
-                    val address = geocoder.getFromLocation(
-                        location.latitude,
-                        location.longitude,
-                        1
-                    )?.firstOrNull()
+               val city = try {
+    // Координати центру Десни
+    val desnaLatitude = 50.9311535
+    val desnaLongitude = 30.75695
 
-                    address?.locality
-                        ?: address?.subAdminArea
-                        ?: address?.adminArea
-                        ?: "Моє місцезнаходження"
-                } catch (_: Exception) {
-                    "Моє місцезнаходження"
-                }
+    // Перевіряємо відстань до Десни
+    val results = FloatArray(1)
+
+    Location.distanceBetween(
+        location.latitude,
+        location.longitude,
+        desnaLatitude,
+        desnaLongitude,
+        results
+    )
+
+    if (results[0] <= 2000f) {
+        "Десна"
+    } else {
+        val geocoder = Geocoder(this, Locale("uk", "UA"))
+
+        @Suppress("DEPRECATION")
+        val address = geocoder.getFromLocation(
+            location.latitude,
+            location.longitude,
+            5
+        )?.firstOrNull()
+
+        address?.locality
+            ?: address?.subAdminArea
+            ?: address?.adminArea
+            ?: "Моє місцезнаходження"
+    }
+} catch (_: Exception) {
+    "Моє місцезнаходження"
+}
 
                 val endpoint =
                     "https://api.open-meteo.com/v1/forecast" +
