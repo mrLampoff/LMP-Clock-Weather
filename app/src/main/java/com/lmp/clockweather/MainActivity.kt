@@ -545,15 +545,48 @@ private fun weatherDescription(code: Int): String = when (code) {
     71, 73, 75 -> "Сніг"; 80, 81, 82 -> "Зливи"; 95, 96, 99 -> "Гроза"
     else -> "Змінна погода"
 }
-private fun getCityName(context: Context, latitude: Double, longitude: Double): String {
+private fun getCityName(
+    context: Context,
+    latitude: Double,
+    longitude: Double
+): String {
+
+    // Координати центру Десни
+    val desnaLatitude = 50.9311535
+    val desnaLongitude = 30.75695
+
+    // Перевірка відстані до Десни
+    val results = FloatArray(1)
+
+    Location.distanceBetween(
+        latitude,
+        longitude,
+        desnaLatitude,
+        desnaLongitude,
+        results
+    )
+
+    // Якщо відстань не більше 2 км — показуємо Десна
+    if (results[0] <= 2000f) {
+        return "Десна"
+    }
+
+    // В інших місцях визначаємо назву автоматично
     return try {
         val geocoder = Geocoder(context, Locale("uk", "UA"))
-        val address = geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull()
+
+        @Suppress("DEPRECATION")
+        val address = geocoder.getFromLocation(
+            latitude,
+            longitude,
+            5
+        )?.firstOrNull()
 
         address?.locality
             ?: address?.subAdminArea
             ?: address?.adminArea
             ?: "Моє місцезнаходження"
+
     } catch (e: Exception) {
         "Моє місцезнаходження"
     }
