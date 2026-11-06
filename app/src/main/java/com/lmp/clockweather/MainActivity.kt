@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import android.location.LocationManager
 import android.location.Geocoder
 import android.net.Uri
@@ -154,26 +157,37 @@ fun LmpWeatherApp() {
             error = "Не вдалося запустити фонове оновлення погоди."
         }
 
-        val loc = getLastKnownLocation(context)
+          getFreshLocation(context) { freshLocation ->
 
-        if (loc != null) {
-            scope.launch {
-                val city = withContext(Dispatchers.IO) {
-                    getCityName(
+            val loc = freshLocation ?: getLastKnownLocation(context)
+
+            if (loc != null) {
+                scope.launch {
+                    val city = withContext(Dispatchers.IO) {
+                        getCityName(
+                            context,
+                            loc.latitude,
+                            loc.longitude
+                        )
+                    }
+
+                    LocationStore.save(
                         context,
                         loc.latitude,
-                        loc.longitude
+                        loc.longitude,
+                        city
+                    )
+
+                    load(
+                        loc.latitude,
+                        loc.longitude,
+                        city
                     )
                 }
-
-                // Save the exact same coordinates and city for the widget.
-                LocationStore.save(context, loc.latitude, loc.longitude, city)
-                load(
-                    loc.latitude,
-                    loc.longitude,
-                    city
-                )
-            }
+    } else {
+        load()
+    }
+}
         } else {
             load()
         }
@@ -498,6 +512,48 @@ private fun getLastKnownLocation(context: Context): Location? {
     } catch (_: Exception) { null }
 }
 
+private fun getFreshLocation(
+    context: Context,
+    onResult: (Location?) -> Unit
+) {
+    val fineGranted =
+        context.checkSelfPermission(
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+    val coarseGranted =
+        context.checkSelfPermission(
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+    if (!fineGranted && !coarseGranted) {
+        onResult(null)
+        return
+    }
+
+    try {
+        val fusedClient =
+            LocationServices.getFusedLocationProviderClient(context)
+
+        val cancellationToken = CancellationTokenSource()
+
+        fusedClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            cancellationToken.token
+        )
+            .addOnSuccessListener { location ->
+                onResult(location)
+            }
+            .addOnFailureListener {
+                onResult(null)
+            }
+
+    } catch (_: SecurityException) {
+        onResult(null)
+    } catch (_: Exception) {
+        onResult(null)
+    }
+}
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
     val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
