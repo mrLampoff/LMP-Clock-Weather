@@ -184,12 +184,9 @@ fun LmpWeatherApp() {
                         city
                     )
                 }
-    } else {
-        load()
-    }
-}
-        } else {
-            load()
+            } else {
+                load()
+            }
         }
     }
 
