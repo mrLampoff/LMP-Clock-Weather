@@ -1,16 +1,49 @@
+
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <corners android:radius="28dp" />
+    <!-- Основне димчасте скло -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="30dp"/>
+            <gradient
+                android:angle="90"
+                android:startColor="#702B3B4D"
+                android:centerColor="#5C172432"
+                android:endColor="#80101925"/>
+        </shape>
+    </item>
 
-    <gradient
-        android:startColor="#991A2736"
-        android:endColor="#66101A26"
-        android:angle="90" />
+    <!-- Верхній скляний відблиск -->
+    <item
+        android:left="1dp"
+        android:top="1dp"
+        android:right="1dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="29dp"/>
+            <gradient
+                android:angle="90"
+                android:startColor="#32FFFFFF"
+                android:centerColor="#08FFFFFF"
+                android:endColor="#00FFFFFF"/>
+        </shape>
+    </item>
 
-    <stroke
-        android:width="1dp"
-        android:color="#99FFFFFF" />
+    <!-- М'яке внутрішнє затемнення знизу -->
+    <item
+        android:left="1dp"
+        android:top="2dp"
+        android:right="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="29dp"/>
+            <gradient
+                android:angle="270"
+                android:startColor="#00000000"
+                android:centerColor="#08000000"
+                android:endColor="#35101824"/>
+        </shape>
+    </item>
 
-</shape>
+</layer-list>
