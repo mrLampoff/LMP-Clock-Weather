@@ -1,8 +1,5 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- TRANSPARENT BLUE-GREY GLASS -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -14,8 +11,6 @@
                 android:endColor="#38566F82"/>
         </shape>
     </item>
-
-    <!-- SOFT TOP REFLECTION -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -27,8 +22,6 @@
                 android:endColor="#00FFFFFF"/>
         </shape>
     </item>
-
-    <!-- SUBTLE LOWER GLASS SHADOW -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -40,5 +33,4 @@
                 android:endColor="#1C0C1D2A"/>
         </shape>
     </item>
-
 </layer-list>
