@@ -113,12 +113,13 @@
         </LinearLayout>
 
         <!-- VERTICAL DIVIDER -->
-        <View
+        <TextView
             android:layout_width="1dp"
             android:layout_height="76dp"
             android:background="#35FFFFFF"
             android:layout_marginStart="8dp"
-            android:layout_marginEnd="12dp" />
+            android:layout_marginEnd="12dp"
+            android:text="" />
 
         <!-- WEATHER SECTION -->
         <LinearLayout
