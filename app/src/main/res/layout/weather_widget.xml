@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="12dp"
     android:background="@drawable/widget_background">
 
     <!-- HEADER -->
@@ -23,18 +23,18 @@
             android:textColor="#C8FFFFFF"
             android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.16" />
+            android:letterSpacing="0.18" />
 
         <ImageButton
             android:id="@+id/widget_refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:background="@android:color/transparent"
             android:src="@android:drawable/ic_popup_sync"
             android:tint="#DFFFFFFF"
             android:contentDescription="Оновити погоду"
             android:scaleType="centerInside"
-            android:padding="6dp" />
+            android:padding="5dp" />
 
     </LinearLayout>
 
@@ -45,7 +45,7 @@
         android:layout_weight="1"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginTop="5dp">
+        android:layout_marginTop="2dp">
 
         <!-- CLOCK SECTION -->
         <LinearLayout
@@ -63,11 +63,11 @@
                 android:format12Hour="h:mm"
                 android:format24Hour="HH:mm"
                 android:textColor="#FFFFFFFF"
-                android:textSize="56sp"
+                android:textSize="68sp"
                 android:textStyle="normal"
                 android:fontFamily="sans-serif-light"
                 android:includeFontPadding="false"
-                android:letterSpacing="-0.04" />
+                android:letterSpacing="-0.05" />
 
             <TextClock
                 android:id="@+id/widget_date"
@@ -75,11 +75,13 @@
                 android:layout_height="wrap_content"
                 android:format12Hour="EEEE, d MMMM"
                 android:format24Hour="EEEE, d MMMM"
-                android:textColor="#BFFFFFFF"
-                android:textSize="13sp"
+                android:textColor="#DFFFFFFF"
+                android:textSize="15sp"
                 android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
-                android:layout_marginTop="7dp" />
+                android:layout_marginTop="6dp"
+                android:maxLines="1"
+                android:ellipsize="end" />
 
             <LinearLayout
                 android:id="@+id/widget_city_area"
@@ -87,23 +89,24 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="14dp">
+                android:layout_marginTop="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="⌖"
                     android:textColor="#AFFFFFFF"
-                    android:textSize="16sp"
+                    android:textSize="17sp"
                     android:layout_marginEnd="6dp" />
 
                 <TextView
                     android:id="@+id/widget_city"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="Десна"
-                    android:textColor="#DFFFFFFF"
-                    android:textSize="13sp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -115,10 +118,10 @@
         <!-- VERTICAL DIVIDER -->
         <TextView
             android:layout_width="1dp"
-            android:layout_height="82dp"
-            android:background="#35FFFFFF"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="12dp"
+            android:layout_height="94dp"
+            android:background="#45FFFFFF"
+            android:layout_marginStart="7dp"
+            android:layout_marginEnd="10dp"
             android:text="" />
 
         <!-- WEATHER SECTION -->
@@ -136,9 +139,9 @@
                 android:layout_height="wrap_content"
                 android:text="☀"
                 android:textColor="#FFFFFFFF"
-                android:textSize="30sp"
+                android:textSize="38sp"
                 android:includeFontPadding="false"
-                android:layout_marginBottom="2dp" />
+                android:layout_marginBottom="1dp" />
 
             <TextView
                 android:id="@+id/widget_temperature"
@@ -146,18 +149,19 @@
                 android:layout_height="wrap_content"
                 android:text="--°"
                 android:textColor="#FFFFFFFF"
-                android:textSize="44sp"
+                android:textSize="54sp"
                 android:fontFamily="sans-serif-light"
-                android:includeFontPadding="false" />
+                android:includeFontPadding="false"
+                android:letterSpacing="-0.04" />
 
             <TextView
                 android:id="@+id/widget_high_low"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="↑ --°  ↓ --°"
-                android:textColor="#BFFFFFFF"
-                android:textSize="12sp"
-                android:layout_marginTop="4dp"
+                android:textColor="#DFFFFFFF"
+                android:textSize="14sp"
+                android:layout_marginTop="3dp"
                 android:includeFontPadding="false" />
 
             <TextView
@@ -165,12 +169,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Завантаження..."
-                android:textColor="#DFFFFFFF"
-                android:textSize="12sp"
+                android:textColor="#FFFFFFFF"
+                android:textSize="14sp"
                 android:gravity="end"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="5dp"
                 android:includeFontPadding="false" />
 
         </LinearLayout>
