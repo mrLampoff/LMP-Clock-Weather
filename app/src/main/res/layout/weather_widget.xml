@@ -4,13 +4,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="16dp"
     android:background="@drawable/widget_background">
 
     <!-- HEADER -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="28dp"
+        android:layout_height="30dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -27,8 +27,8 @@
 
         <ImageButton
             android:id="@+id/widget_refresh"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="@android:color/transparent"
             android:src="@android:drawable/ic_popup_sync"
             android:tint="#DFFFFFFF"
@@ -63,7 +63,7 @@
                 android:format12Hour="h:mm"
                 android:format24Hour="HH:mm"
                 android:textColor="#FFFFFFFF"
-                android:textSize="43sp"
+                android:textSize="56sp"
                 android:textStyle="normal"
                 android:fontFamily="sans-serif-light"
                 android:includeFontPadding="false"
@@ -76,10 +76,10 @@
                 android:format12Hour="EEEE, d MMMM"
                 android:format24Hour="EEEE, d MMMM"
                 android:textColor="#BFFFFFFF"
-                android:textSize="11sp"
+                android:textSize="13sp"
                 android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
-                android:layout_marginTop="5dp" />
+                android:layout_marginTop="7dp" />
 
             <LinearLayout
                 android:id="@+id/widget_city_area"
@@ -87,15 +87,15 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="12dp">
+                android:layout_marginTop="14dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="⌖"
                     android:textColor="#AFFFFFFF"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="5dp" />
+                    android:textSize="16sp"
+                    android:layout_marginEnd="6dp" />
 
                 <TextView
                     android:id="@+id/widget_city"
@@ -103,7 +103,7 @@
                     android:layout_height="wrap_content"
                     android:text="Десна"
                     android:textColor="#DFFFFFFF"
-                    android:textSize="11sp"
+                    android:textSize="13sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -115,7 +115,7 @@
         <!-- VERTICAL DIVIDER -->
         <TextView
             android:layout_width="1dp"
-            android:layout_height="76dp"
+            android:layout_height="82dp"
             android:background="#35FFFFFF"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="12dp"
@@ -136,7 +136,7 @@
                 android:layout_height="wrap_content"
                 android:text="☀"
                 android:textColor="#FFFFFFFF"
-                android:textSize="27sp"
+                android:textSize="30sp"
                 android:includeFontPadding="false"
                 android:layout_marginBottom="2dp" />
 
@@ -146,7 +146,7 @@
                 android:layout_height="wrap_content"
                 android:text="--°"
                 android:textColor="#FFFFFFFF"
-                android:textSize="37sp"
+                android:textSize="44sp"
                 android:fontFamily="sans-serif-light"
                 android:includeFontPadding="false" />
 
@@ -156,8 +156,8 @@
                 android:layout_height="wrap_content"
                 android:text="↑ --°  ↓ --°"
                 android:textColor="#BFFFFFFF"
-                android:textSize="10sp"
-                android:layout_marginTop="3dp"
+                android:textSize="12sp"
+                android:layout_marginTop="4dp"
                 android:includeFontPadding="false" />
 
             <TextView
@@ -166,11 +166,11 @@
                 android:layout_height="wrap_content"
                 android:text="Завантаження..."
                 android:textColor="#DFFFFFFF"
-                android:textSize="10sp"
+                android:textSize="12sp"
                 android:gravity="end"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:layout_marginTop="5dp"
+                android:layout_marginTop="6dp"
                 android:includeFontPadding="false" />
 
         </LinearLayout>
