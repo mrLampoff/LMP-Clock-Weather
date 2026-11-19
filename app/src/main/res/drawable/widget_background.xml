@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Transparent blue-grey glass -->
+    <!-- Transparent blue-grey glass body -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -9,39 +9,39 @@
         </shape>
     </item>
 
-    <!-- Upper curved reflection -->
-    <item android:height="52dp" android:gravity="top">
-        <shape android:shape="rectangle">
-            <corners android:radius="30dp"/>
-            <gradient
-                android:type="linear"
-                android:angle="90"
-                android:startColor="#38FFFFFF"
-                android:centerColor="#16FFFFFF"
-                android:endColor="#00FFFFFF"/>
-        </shape>
-    </item>
-
-    <!-- Central glass glow -->
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="30dp"/>
-            <gradient
-                android:type="linear"
-                android:angle="90"
-                android:startColor="#12FFFFFF"
-                android:centerColor="#04FFFFFF"
-                android:endColor="#00FFFFFF"/>
-        </shape>
-    </item>
-
-    <!-- Lower depth -->
+    <!-- Smooth light reflection across the entire surface -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
             <gradient
                 android:type="linear"
                 android:angle="270"
+                android:startColor="#28EAF5FF"
+                android:centerColor="#0CEAF5FF"
+                android:endColor="#00EAF5FF"/>
+        </shape>
+    </item>
+
+    <!-- Soft side illumination -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="30dp"/>
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#18DCEBFA"
+                android:centerColor="#00DCEBFA"
+                android:endColor="#18DCEBFA"/>
+        </shape>
+    </item>
+
+    <!-- Subtle lower glass depth -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="30dp"/>
+            <gradient
+                android:type="linear"
+                android:angle="90"
                 android:startColor="#00000000"
                 android:centerColor="#080D1D29"
                 android:endColor="#28101C29"/>
