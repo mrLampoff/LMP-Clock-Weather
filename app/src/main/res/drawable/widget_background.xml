@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Transparent blue-grey glass body -->
+    <!-- Transparent blue-grey glass -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -9,23 +9,20 @@
         </shape>
     </item>
 
-    <!-- Soft curved upper reflection -->
-    <item
-        android:width="match_parent"
-        android:height="52dp"
-        android:gravity="top">
-        <shape android:shape="oval">
+    <!-- Upper curved reflection -->
+    <item android:height="52dp" android:gravity="top">
+        <shape android:shape="rectangle">
+            <corners android:radius="30dp"/>
             <gradient
-                android:type="radial"
-                android:gradientRadius="240dp"
-                android:centerX="0.5"
-                android:centerY="0.0"
+                android:type="linear"
+                android:angle="90"
                 android:startColor="#38FFFFFF"
+                android:centerColor="#16FFFFFF"
                 android:endColor="#00FFFFFF"/>
         </shape>
     </item>
 
-    <!-- Gentle central glass glow -->
+    <!-- Central glass glow -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -38,7 +35,7 @@
         </shape>
     </item>
 
-    <!-- Dark lower edge for depth -->
+    <!-- Lower depth -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp"/>
@@ -48,16 +45,6 @@
                 android:startColor="#00000000"
                 android:centerColor="#080D1D29"
                 android:endColor="#28101C29"/>
-        </shape>
-    </item>
-
-    <!-- Very subtle blue-grey edge, not a white border -->
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="30dp"/>
-            <stroke
-                android:width="1dp"
-                android:color="#183D5365"/>
         </shape>
     </item>
 
