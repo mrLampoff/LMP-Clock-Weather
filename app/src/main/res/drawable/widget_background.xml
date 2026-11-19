@@ -1,61 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Основний шар: прозоре блакитно-сіре скло -->
+    <!-- Базове прозоре блакитно-сіре скло -->
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="30dp" />
-            <gradient
-                android:angle="90"
-                android:startColor="#3DDFEAF2"
-                android:centerColor="#28C8D8E5"
-                android:endColor="#45A9BBCB" />
+            <corners android:radius="30dp"/>
+            <solid android:color="#38C9D8E5"/>
         </shape>
     </item>
 
-    <!-- М'який опуклий відблиск зверху -->
+    <!-- Опуклий світловий відблиск зверху -->
     <item
         android:left="1dp"
         android:top="1dp"
         android:right="1dp"
         android:bottom="2dp">
         <shape android:shape="rectangle">
-            <corners android:radius="29dp" />
+            <corners android:radius="29dp"/>
             <gradient
+                android:type="linear"
                 android:angle="90"
-                android:startColor="#48FFFFFF"
-                android:centerColor="#16FFFFFF"
-                android:endColor="#00FFFFFF" />
+                android:startColor="#38FFFFFF"
+                android:centerColor="#0EFFFFFF"
+                android:endColor="#00FFFFFF"/>
         </shape>
     </item>
 
-    <!-- Ледь помітне внутрішнє затемнення знизу -->
+    <!-- М'яке центральне освітлення -->
+    <item
+        android:left="2dp"
+        android:top="2dp"
+        android:right="2dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="28dp"/>
+            <gradient
+                android:type="radial"
+                android:gradientRadius="260dp"
+                android:centerX="50%"
+                android:centerY="35%"
+                android:startColor="#18FFFFFF"
+                android:centerColor="#08E8F2FA"
+                android:endColor="#001B2938"/>
+        </shape>
+    </item>
+
+    <!-- Нижнє внутрішнє затемнення -->
     <item
         android:left="1dp"
         android:top="2dp"
         android:right="1dp"
         android:bottom="1dp">
         <shape android:shape="rectangle">
-            <corners android:radius="29dp" />
+            <corners android:radius="29dp"/>
             <gradient
                 android:angle="270"
-                android:startColor="#00FFFFFF"
-                android:centerColor="#080E2638"
-                android:endColor="#25102030" />
-        </shape>
-    </item>
-
-    <!-- Тонкий внутрішній контур -->
-    <item
-        android:left="1dp"
-        android:top="1dp"
-        android:right="1dp"
-        android:bottom="1dp">
-        <shape android:shape="rectangle">
-            <corners android:radius="29dp" />
-            <stroke
-                android:width="0.5dp"
-                android:color="#20FFFFFF" />
+                android:startColor="#00000000"
+                android:centerColor="#080E1D2A"
+                android:endColor="#28233342"/>
         </shape>
     </item>
 
