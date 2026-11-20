@@ -40,7 +40,6 @@ class WeatherLocationService : Service() {
 
     private lateinit var locationManager: LocationManager
     private val handler = Handler(Looper.getMainLooper())
-
     private var currentCity = "Визначаємо місто…"
     private var currentTemperature = "--°"
     private var currentHigh = "--°"
@@ -66,11 +65,7 @@ class WeatherLocationService : Service() {
         createNotificationChannel()
     }
 
-    override fun onStartCommand(
-        intent: Intent?,
-        flags: Int,
-        startId: Int
-    ): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopTracking()
             return START_NOT_STICKY
@@ -124,9 +119,8 @@ class WeatherLocationService : Service() {
 
         val backgroundGranted =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-                checkSelfPermission(
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
+                checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
 
         return (fineGranted || coarseGranted) && backgroundGranted
     }
@@ -136,7 +130,6 @@ class WeatherLocationService : Service() {
 
         try {
             val providers = locationManager.getProviders(true)
-
             val location = providers.mapNotNull { provider ->
                 try {
                     locationManager.getLastKnownLocation(provider)
@@ -156,9 +149,11 @@ class WeatherLocationService : Service() {
         thread {
             try {
                 val city = try {
+                    // Координати центру Десни
                     val desnaLatitude = 50.9311535
                     val desnaLongitude = 30.75695
 
+                    // Перевіряємо відстань до Десни
                     val results = FloatArray(1)
 
                     Location.distanceBetween(
@@ -172,10 +167,7 @@ class WeatherLocationService : Service() {
                     if (results[0] <= 2000f) {
                         "Десна"
                     } else {
-                        val geocoder = Geocoder(
-                            this,
-                            Locale("uk", "UA")
-                        )
+                        val geocoder = Geocoder(this, Locale("uk", "UA"))
 
                         @Suppress("DEPRECATION")
                         val address = geocoder.getFromLocation(
@@ -195,11 +187,11 @@ class WeatherLocationService : Service() {
 
                 val endpoint =
                     "https://api.open-meteo.com/v1/forecast" +
-                    "?latitude=${location.latitude}" +
-                    "&longitude=${location.longitude}" +
-                    "&current=temperature_2m" +
-                    "&daily=temperature_2m_max,temperature_2m_min" +
-                    "&timezone=auto&forecast_days=1"
+                        "?latitude=${location.latitude}" +
+                        "&longitude=${location.longitude}" +
+                        "&current=temperature_2m" +
+                        "&daily=temperature_2m_max,temperature_2m_min" +
+                        "&timezone=auto&forecast_days=1"
 
                 val connection =
                     (URL(endpoint).openConnection() as HttpURLConnection).apply {
@@ -221,33 +213,20 @@ class WeatherLocationService : Service() {
                 val current = json.getJSONObject("current")
                 val daily = json.getJSONObject("daily")
 
-                val temp =
-                    current.getDouble("temperature_2m").toInt()
+                val temp = current.getDouble("temperature_2m").toInt()
+                val high = daily.getJSONArray("temperature_2m_max")
+                    .getDouble(0).toInt()
+                val low = daily.getJSONArray("temperature_2m_min")
+                    .getDouble(0).toInt()
 
-                val high =
-                    daily.getJSONArray("temperature_2m_max")
-                        .getDouble(0).toInt()
-
-                val low =
-                    daily.getJSONArray("temperature_2m_min")
-                        .getDouble(0).toInt()
-
-                LocationStore.save(
-                    this,
-                    location.latitude,
-                    location.longitude,
-                    city
-                )
+                // Share the same location with the home-screen widget.
+                LocationStore.save(this, location.latitude, location.longitude, city)
 
                 handler.post {
                     currentCity = city
-                    currentTemperature =
-                        "${if (temp > 0) "+" else ""}${temp}°"
-                    currentHigh =
-                        "${if (high > 0) "+" else ""}${high}°"
-                    currentLow =
-                        "${if (low > 0) "+" else ""}${low}°"
-
+                    currentTemperature = "${if (temp > 0) "+" else ""}${temp}°"
+                    currentHigh = "${if (high > 0) "+" else ""}${high}°"
+                    currentLow = "${if (low > 0) "+" else ""}${low}°"
                     updateNotification()
                 }
 
@@ -266,55 +245,45 @@ class WeatherLocationService : Service() {
                 "Фонова погода LMP",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description =
-                    "Поточна температура та місцезнаходження"
+                description = "Поточна температура та місцезнаходження"
                 setShowBadge(false)
             }
 
             val manager =
                 getSystemService(NotificationManager::class.java)
-
             manager.createNotificationChannel(channel)
         }
     }
 
-    private fun buildNotification(
-        message: String? = null
-    ): Notification {
-
+    private fun buildNotification(message: String? = null): Notification {
         val openIntent = Intent(this, MainActivity::class.java)
-
         val openPendingIntent = PendingIntent.getActivity(
             this,
             0,
             openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopIntent =
-            Intent(this, WeatherLocationService::class.java).apply {
-                action = ACTION_STOP
-            }
+        val stopIntent = Intent(this, WeatherLocationService::class.java).apply {
+            action = ACTION_STOP
+        }
 
         val stopPendingIntent = PendingIntent.getService(
             this,
             1,
             stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val content = message
-            ?: "$currentTemperature · $currentCity · Мін. $currentLow · Макс. $currentHigh"
+        val content =
+            message ?: "$currentTemperature · $currentCity · Мін. $currentLow · Макс. $currentHigh"
 
-        val builder =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Notification.Builder(this, CHANNEL_ID)
-            } else {
-                @Suppress("DEPRECATION")
-                Notification.Builder(this)
-            }
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
 
         return builder
             .setSmallIcon(createTemperatureIcon())
@@ -323,8 +292,8 @@ class WeatherLocationService : Service() {
             .setStyle(
                 Notification.BigTextStyle().bigText(
                     "$currentTemperature · $currentCity\n" +
-                    "Мінімум: $currentLow · Максимум: $currentHigh\n" +
-                    "Фонове оновлення активне"
+                        "Мінімум: $currentLow · Максимум: $currentHigh\n" +
+                        "Фонове оновлення активне"
                 )
             )
             .setContentIntent(openPendingIntent)
@@ -336,10 +305,10 @@ class WeatherLocationService : Service() {
     }
 
     private fun createTemperatureIcon(): Icon {
-        // Максимально великий жирний напис температури
+        // Велика температура на прозорому тлі.
         val bitmap = Bitmap.createBitmap(
-            72,
-            72,
+            96,
+            96,
             Bitmap.Config.ARGB_8888
         ).apply {
             density = resources.displayMetrics.densityDpi
@@ -354,7 +323,7 @@ class WeatherLocationService : Service() {
                 "sans-serif-condensed",
                 Typeface.BOLD
             )
-            textSize = 64f
+            textSize = 88f
         }
 
         val label = currentTemperature
@@ -381,13 +350,9 @@ class WeatherLocationService : Service() {
 
     private fun updateNotification(message: String? = null) {
         val manager =
-            getSystemService(Context.NOTIFICATION_SERVICE)
-                as NotificationManager
+            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        manager.notify(
-            NOTIFICATION_ID,
-            buildNotification(message)
-        )
+        manager.notify(NOTIFICATION_ID, buildNotification(message))
     }
 
     private fun stopTracking() {
