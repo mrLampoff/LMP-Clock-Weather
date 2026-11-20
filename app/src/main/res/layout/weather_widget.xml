@@ -52,7 +52,7 @@
                 android:format12Hour="h:mm"
                 android:format24Hour="HH:mm"
                 android:textColor="#FFFFFFFF"
-                android:textSize="74sp"
+                android:textSize="82sp"
                 android:textStyle="normal"
                 android:fontFamily="sans-serif-light"
                 android:includeFontPadding="false"
@@ -67,7 +67,7 @@
                 android:format12Hour="EEEE, d MMMM"
                 android:format24Hour="EEEE, d MMMM"
                 android:textColor="#DFFFFFFF"
-                android:textSize="17sp"
+                android:textSize="18sp"
                 android:fontFamily="sans-serif"
                 android:includeFontPadding="false"
                 android:layout_marginTop="6dp"
@@ -87,7 +87,7 @@
                     android:layout_height="wrap_content"
                     android:text="⌖"
                     android:textColor="#AFFFFFFF"
-                    android:textSize="18sp"
+                    android:textSize="20sp"
                     android:layout_marginEnd="6dp" />
 
                 <TextView
@@ -97,7 +97,7 @@
                     android:layout_weight="1"
                     android:text="Десна"
                     android:textColor="#FFFFFFFF"
-                    android:textSize="17sp"
+                    android:textSize="19sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -106,16 +106,14 @@
 
         </LinearLayout>
 
-      
-<!-- VERTICAL DIVIDER -->
-<TextView
-    android:layout_width="1dp"
-    android:layout_height="94dp"
-    android:background="#45FFFFFF"
-    android:layout_marginStart="7dp"
-    android:layout_marginEnd="10dp"
-    android:text="" />
-
+        <!-- VERTICAL DIVIDER -->
+        <TextView
+            android:layout_width="1dp"
+            android:layout_height="94dp"
+            android:background="#45FFFFFF"
+            android:layout_marginStart="7dp"
+            android:layout_marginEnd="10dp"
+            android:text="" />
 
         <!-- WEATHER SECTION -->
         <LinearLayout
