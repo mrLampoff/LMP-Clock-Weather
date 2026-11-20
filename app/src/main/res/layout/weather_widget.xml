@@ -7,34 +7,12 @@
     android:padding="12dp"
     android:background="@drawable/widget_background">
 
-    <!-- HEADER: REFRESH BUTTON -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:gravity="center_vertical|end"
-        android:orientation="horizontal">
-
-        <ImageButton
-            android:id="@+id/widget_refresh"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:background="@android:color/transparent"
-            android:src="@android:drawable/ic_popup_sync"
-            android:tint="#DFFFFFFF"
-            android:contentDescription="Оновити погоду"
-            android:scaleType="centerInside"
-            android:padding="5dp" />
-
-    </LinearLayout>
-
     <!-- MAIN CONTENT -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="2dp">
+        android:gravity="center_vertical">
 
         <!-- CLOCK SECTION -->
         <LinearLayout
@@ -116,69 +94,89 @@
             android:text="" />
 
         <!-- WEATHER SECTION -->
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/widget_weather_area"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="0.75"
-            android:orientation="vertical"
-            android:gravity="center_vertical|end">
+            android:layout_weight="0.75">
 
-            <!-- ICON + TEMPERATURE -->
+            <!-- WEATHER DATA -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical|end">
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center_vertical|end"
+                android:paddingTop="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical|end">
+
+                    <TextView
+                        android:id="@+id/widget_icon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="☀"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="46sp"
+                        android:includeFontPadding="false"
+                        android:layout_marginEnd="5dp" />
+
+                    <TextView
+                        android:id="@+id/widget_temperature"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--°"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="62sp"
+                        android:fontFamily="sans-serif-light"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="-0.04" />
+
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/widget_icon"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/widget_high_low"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="☀"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="46sp"
-                    android:includeFontPadding="false"
-                    android:layout_marginEnd="5dp" />
+                    android:text="↑ --°  ↓ --°"
+                    android:textColor="#DFFFFFFF"
+                    android:textSize="15sp"
+                    android:gravity="end"
+                    android:layout_marginTop="5dp"
+                    android:includeFontPadding="false" />
 
                 <TextView
-                    android:id="@+id/widget_temperature"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/widget_weather"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="--°"
+                    android:text="Завантаження..."
                     android:textColor="#FFFFFFFF"
-                    android:textSize="62sp"
-                    android:fontFamily="sans-serif-light"
-                    android:includeFontPadding="false"
-                    android:letterSpacing="-0.04" />
+                    android:textSize="15sp"
+                    android:gravity="end"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginTop="6dp"
+                    android:includeFontPadding="false" />
 
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/widget_high_low"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="↑ --°  ↓ --°"
-                android:textColor="#DFFFFFFF"
-                android:textSize="15sp"
-                android:gravity="end"
-                android:layout_marginTop="5dp"
-                android:includeFontPadding="false" />
+            <!-- REFRESH BUTTON: TOP RIGHT -->
+            <ImageButton
+                android:id="@+id/widget_refresh"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_gravity="top|end"
+                android:background="@android:color/transparent"
+                android:src="@android:drawable/ic_popup_sync"
+                android:tint="#DFFFFFFF"
+                android:contentDescription="Оновити погоду"
+                android:scaleType="centerInside"
+                android:padding="5dp" />
 
-            <TextView
-                android:id="@+id/widget_weather"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Завантаження..."
-                android:textColor="#FFFFFFFF"
-                android:textSize="15sp"
-                android:gravity="end"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:layout_marginTop="6dp"
-                android:includeFontPadding="false" />
-
-        </LinearLayout>
+        </FrameLayout>
 
     </LinearLayout>
 
