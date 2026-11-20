@@ -269,7 +269,7 @@ class WeatherLocationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val content = message ?: "$currentTemperature · Мін. $currentLow · Макс. $currentHigh"
+        val content = message ?: "$currentTemperature · $currentCity · Мін. $currentLow · Макс. $currentHigh"
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -279,13 +279,12 @@ class WeatherLocationService : Service() {
         }
 
         return builder
-            .setSmallIcon(applicationInfo.icon)
+            .setSmallIcon(R.drawable.ic_notification_thermometer)
             .setContentTitle("LMP Weather · $currentCity")
             .setContentText(content)
             .setStyle(
                 Notification.BigTextStyle().bigText(
-                    "$currentCity\n" +
-                    "Зараз: $currentTemperature\n" +
+                    "$currentTemperature · $currentCity\n" +
                     "Мінімум: $currentLow · Максимум: $currentHigh\n" +
                     "Фонове оновлення активне"
                 )
