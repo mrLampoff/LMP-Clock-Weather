@@ -41,7 +41,7 @@
             android:id="@+id/widget_clock_area"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1.15"
+            android:layout_weight="1.25"
             android:orientation="vertical"
             android:gravity="center_vertical">
 
@@ -120,7 +120,7 @@
             android:id="@+id/widget_weather_area"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="0.85"
+            android:layout_weight="0.75"
             android:orientation="vertical"
             android:gravity="center_vertical|end">
 
