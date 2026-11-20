@@ -52,11 +52,11 @@
                 android:format12Hour="h:mm"
                 android:format24Hour="HH:mm"
                 android:textColor="#FFFFFFFF"
-                android:textSize="82sp"
+                android:textSize="92sp"
                 android:textStyle="normal"
                 android:fontFamily="sans-serif-light"
                 android:includeFontPadding="false"
-                android:letterSpacing="-0.05"
+                android:letterSpacing="-0.06"
                 android:maxLines="1"
                 android:singleLine="true" />
 
