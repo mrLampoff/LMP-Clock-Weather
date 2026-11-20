@@ -305,21 +305,25 @@ class WeatherLocationService : Service() {
     }
 
     private fun createTemperatureIcon(): Icon {
-        // Small notification icons are rendered as a monochrome alpha mask.
-        val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
+        // Draw bold temperature text across almost the full notification-icon area.
+        // Android/One UI will still apply its standard small-icon size.
+        val bitmap = Bitmap.createBitmap(72, 72, Bitmap.Config.ARGB_8888).apply {
+            density = resources.displayMetrics.densityDpi
+        }
         val canvas = Canvas(bitmap)
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            textSize = 46f
         }
 
         val label = currentTemperature
-        paint.textSize = when {
-            label.length >= 5 -> 13f
-            label.length == 4 -> 15f
-            else -> 19f
+        val availableWidth = bitmap.width - 6f
+        val measuredWidth = paint.measureText(label)
+        if (measuredWidth > availableWidth) {
+            paint.textSize *= availableWidth / measuredWidth
         }
 
         val metrics = paint.fontMetrics
