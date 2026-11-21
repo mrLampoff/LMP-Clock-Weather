@@ -309,24 +309,26 @@ class WeatherLocationService : Service() {
 
 
     private fun createTemperatureIcon(): Icon {
-        // Android renders small notification icons as a monochrome alpha mask.
-        // Draw only the temperature text on a transparent bitmap.
-        val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply {
-            density = resources.displayMetrics.densityDpi
+        // Draw a high-resolution, transparent temperature glyph.
+        // DENSITY_NONE prevents Android from shrinking the bitmap based on screen DPI.
+        val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply {
+            density = android.util.DisplayMetrics.DENSITY_NONE
         }
         val canvas = Canvas(bitmap)
 
+        val label = currentTemperature
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        }
-
-        val label = currentTemperature
-        paint.textSize = when {
-            label.length >= 5 -> 13f
-            label.length == 4 -> 15f
-            else -> 19f
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+            textSize = when {
+                label.length >= 5 -> 34f
+                label.length == 4 -> 40f
+                else -> 48f
+            }
+            // A small stroke keeps thin glyph edges visible after status-bar scaling.
+            style = Paint.Style.FILL_AND_STROKE
+            strokeWidth = 1.2f
         }
 
         val metrics = paint.fontMetrics
