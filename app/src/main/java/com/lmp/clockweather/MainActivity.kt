@@ -82,7 +82,18 @@ data class DayForecast(val day: String, val code: Int, val high: Int, val low: I
 
 data class HourForecast(val time: String, val temperature: Int, val code: Int, val precipitation: Int, val wind: Int)
 
-data class WeatherBundle(val now: WeatherNow, val days: List<DayForecast>, val hours: List<HourForecast>)
+data class AirQuality(
+    val europeanAqi: Int,
+    val pm25: Double,
+    val pm10: Double
+)
+
+data class WeatherBundle(
+    val now: WeatherNow,
+    val days: List<DayForecast>,
+    val hours: List<HourForecast>,
+    val airQuality: AirQuality?
+)
 
 @Composable
 fun LmpWeatherApp() {
@@ -445,7 +456,11 @@ fun MainWeatherScreen(
                     WeatherMetric("Вологість", "${weather.now.humidity}%", R.drawable.weather_humidity, Modifier.weight(1f))
                     WeatherMetric("Вітер", "${weather.now.wind} км/год", R.drawable.weather_wind, Modifier.weight(1f))
                 }
-                Spacer(Modifier.height(26.dp))
+                Spacer(Modifier.height(18.dp))
+                weather.airQuality?.let { air ->
+                    AirQualityCard(air, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(24.dp))
+                }
                 Text("ПОГОДИННИЙ ПРОГНОЗ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 4.dp)) {
@@ -490,6 +505,67 @@ fun MainWeatherScreen(
             Spacer(Modifier.height(18.dp))
             Text("Дані: Open-Meteo", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
             Text("LMP Clock & Weather", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
+    val (label, advice) = when {
+        air.europeanAqi <= 20 -> "Добра" to "Якість повітря сприятлива"
+        air.europeanAqi <= 40 -> "Задовільна" to "Зазвичай без обмежень для прогулянок"
+        air.europeanAqi <= 60 -> "Помірна" to "Чутливим людям варто звернути увагу"
+        air.europeanAqi <= 80 -> "Погана" to "Чутливим людям краще зменшити навантаження надворі"
+        air.europeanAqi <= 100 -> "Дуже погана" to "Рекомендується обмежити тривале перебування надворі"
+        else -> "Надзвичайно погана" to "Варто уникати тривалого перебування надворі"
+    }
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "ЯКІСТЬ ПОВІТРЯ",
+                    color = mutedWhite,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.8.sp
+                )
+                Spacer(Modifier.height(5.dp))
+                Text(label, color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                Text(advice, color = mutedWhite, fontSize = 12.sp)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    air.europeanAqi.toString(),
+                    color = cream,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Light
+                )
+                Text("Європейський AQI", color = mutedWhite, fontSize = 10.sp)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.18f))
+        Spacer(Modifier.height(11.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("PM2.5", color = mutedWhite, fontSize = 11.sp)
+                Text("${"%.1f".format(Locale.US, air.pm25)} µg/m³", color = cream, fontSize = 16.sp)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("PM10", color = mutedWhite, fontSize = 11.sp)
+                Text("${"%.1f".format(Locale.US, air.pm10)} µg/m³", color = cream, fontSize = 16.sp)
+            }
         }
     }
 }
@@ -606,12 +682,47 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
             val label = if (i == 0) "Сьогодні" else SimpleDateFormat("EEEE", Locale("uk", "UA")).format(date ?: Date()).replaceFirstChar { it.uppercase() }
             DayForecast(label, codes.getInt(i), highs.getDouble(i).toInt(), lows.getDouble(i).toInt())
         }
+        val airQuality = try {
+            fetchAirQuality(lat, lon)
+        } catch (_: Exception) {
+            null
+        }
+
         return WeatherBundle(
             WeatherNow(current.getDouble("temperature_2m").toInt(), current.getDouble("apparent_temperature").toInt(),
                 current.getInt("relative_humidity_2m"), current.getDouble("wind_speed_10m").toInt(),
-                current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(), city), days, hours
+                current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(), city),
+            days,
+            hours,
+            airQuality
         )
     } finally { connection.disconnect() }
+}
+
+private fun fetchAirQuality(lat: Double, lon: Double): AirQuality? {
+    val endpoint =
+        "https://air-quality-api.open-meteo.com/v1/air-quality" +
+        "?latitude=$lat&longitude=$lon" +
+        "&current=european_aqi,pm2_5,pm10" +
+        "&timezone=auto"
+
+    val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 8000
+        readTimeout = 8000
+    }
+
+    try {
+        val body = connection.inputStream.bufferedReader().use { it.readText() }
+        val current = JSONObject(body).getJSONObject("current")
+        return AirQuality(
+            europeanAqi = current.getDouble("european_aqi").toInt(),
+            pm25 = current.getDouble("pm2_5"),
+            pm10 = current.getDouble("pm10")
+        )
+    } finally {
+        connection.disconnect()
+    }
 }
 
 private fun formatTemp(celsius: Int, useCelsius: Boolean): Int = if (useCelsius) celsius else (celsius * 9.0 / 5.0 + 32).toInt()
