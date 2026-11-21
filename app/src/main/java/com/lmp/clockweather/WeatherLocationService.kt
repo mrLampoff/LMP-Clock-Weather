@@ -40,8 +40,10 @@ class WeatherLocationService : Service() {
 
     private lateinit var locationManager: LocationManager
     private val handler = Handler(Looper.getMainLooper())
+
     private var currentCity = "Визначаємо місто…"
     private var currentTemperature = "--°"
+    private var currentStatusTemperature = "--°"
     private var currentHigh = "--°"
     private var currentLow = "--°"
 
@@ -224,9 +226,19 @@ class WeatherLocationService : Service() {
 
                 handler.post {
                     currentCity = city
-                    currentTemperature = "${if (temp > 0) "+" else ""}${temp}°"
-                    currentHigh = "${if (high > 0) "+" else ""}${high}°"
-                    currentLow = "${if (low > 0) "+" else ""}${low}°"
+
+                    currentTemperature =
+                        "${if (temp > 0) "+" else ""}${temp}°"
+
+                    // Для статус-іконки прибираємо знак плюс.
+                    currentStatusTemperature = "${temp}°"
+
+                    currentHigh =
+                        "${if (high > 0) "+" else ""}${high}°"
+
+                    currentLow =
+                        "${if (low > 0) "+" else ""}${low}°"
+
                     updateNotification()
                 }
 
@@ -251,12 +263,14 @@ class WeatherLocationService : Service() {
 
             val manager =
                 getSystemService(NotificationManager::class.java)
+
             manager.createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(message: String? = null): Notification {
         val openIntent = Intent(this, MainActivity::class.java)
+
         val openPendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -305,7 +319,7 @@ class WeatherLocationService : Service() {
     }
 
     private fun createTemperatureIcon(): Icon {
-        // Велика температура на прозорому тлі.
+        // Максимально великий напис температури без знака плюс.
         val bitmap = Bitmap.createBitmap(
             96,
             96,
@@ -326,8 +340,8 @@ class WeatherLocationService : Service() {
             textSize = 88f
         }
 
-        val label = currentTemperature
-        val availableWidth = bitmap.width - 4f
+        val label = currentStatusTemperature
+        val availableWidth = bitmap.width - 2f
         val measuredWidth = paint.measureText(label)
 
         if (measuredWidth > availableWidth) {
