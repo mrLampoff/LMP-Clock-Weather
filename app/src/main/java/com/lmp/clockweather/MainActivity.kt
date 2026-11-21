@@ -79,7 +79,9 @@ data class WeatherNow(
 
 data class DayForecast(val day: String, val code: Int, val high: Int, val low: Int)
 
-data class WeatherBundle(val now: WeatherNow, val days: List<DayForecast>)
+data class HourForecast(val time: String, val temperature: Int, val code: Int, val precipitation: Int, val wind: Int)
+
+data class WeatherBundle(val now: WeatherNow, val days: List<DayForecast>, val hours: List<HourForecast>)
 
 @Composable
 fun LmpWeatherApp() {
@@ -442,7 +444,28 @@ fun MainWeatherScreen(
                     WeatherMetric("Вологість", "${weather.now.humidity}%", R.drawable.weather_humidity, Modifier.weight(1f))
                     WeatherMetric("Вітер", "${weather.now.wind} км/год", R.drawable.weather_wind, Modifier.weight(1f))
                 }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(26.dp))
+                Text("ПОГОДИННИЙ ПРОГНОЗ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(10.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 4.dp)) {
+                    items(weather.hours.size) { index ->
+                        val hour = weather.hours[index]
+                        Column(
+                            modifier = Modifier.width(76.dp).clip(RoundedCornerShape(18.dp)).background(Color.White.copy(alpha = 0.13f)).padding(vertical = 12.dp, horizontal = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(hour.time, color = mutedWhite, fontSize = 13.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Image(painter = painterResource(weatherIconRes(hour.code)), contentDescription = weatherDescription(hour.code), modifier = Modifier.size(30.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("${formatTemp(hour.temperature, useCelsius)}°", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(5.dp))
+                            Text("💧 ${hour.precipitation}%", color = mutedWhite, fontSize = 11.sp)
+                            Text("${hour.wind} км/г", color = mutedWhite, fontSize = 10.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(26.dp))
                 Text("ПРОГНОЗ НА 7 ДНІВ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
                 weather.days.forEach { day ->
@@ -552,7 +575,7 @@ private fun getFreshLocation(
     }
 }
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -561,6 +584,18 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         val root = JSONObject(body)
         val current = root.getJSONObject("current")
         val daily = root.getJSONObject("daily")
+        val hourly = root.getJSONObject("hourly")
+        val hourlyTimes = hourly.getJSONArray("time")
+        val hourlyTemps = hourly.getJSONArray("temperature_2m")
+        val hourlyRain = hourly.getJSONArray("precipitation_probability")
+        val hourlyCodes = hourly.getJSONArray("weather_code")
+        val hourlyWind = hourly.getJSONArray("wind_speed_10m")
+        val nowTime = root.getJSONObject("current").getString("time").take(13)
+        val startHour = (0 until hourlyTimes.length()).firstOrNull { hourlyTimes.getString(it).startsWith(nowTime) } ?: 0
+        val hours = (startHour until minOf(startHour + 24, hourlyTimes.length())).map { i ->
+            val timeLabel = hourlyTimes.getString(i).substringAfter("T")
+            HourForecast(timeLabel, hourlyTemps.getDouble(i).toInt(), hourlyCodes.getInt(i), hourlyRain.getInt(i), hourlyWind.getDouble(i).toInt())
+        }
         val times = daily.getJSONArray("time")
         val codes = daily.getJSONArray("weather_code")
         val highs = daily.getJSONArray("temperature_2m_max")
@@ -573,7 +608,7 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         return WeatherBundle(
             WeatherNow(current.getDouble("temperature_2m").toInt(), current.getDouble("apparent_temperature").toInt(),
                 current.getInt("relative_humidity_2m"), current.getDouble("wind_speed_10m").toInt(),
-                current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(), city), days
+                current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(), city), days, hours
         )
     } finally { connection.disconnect() }
 }
