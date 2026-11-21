@@ -85,7 +85,8 @@ data class HourForecast(val time: String, val temperature: Int, val code: Int, v
 data class AirQuality(
     val europeanAqi: Int,
     val pm25: Double,
-    val pm10: Double
+    val pm10: Double,
+    val updatedAt: String
 )
 
 data class WeatherBundle(
@@ -511,14 +512,16 @@ fun MainWeatherScreen(
 
 @Composable
 fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
-    val (label, advice) = when {
-        air.europeanAqi <= 20 -> "Добра" to "Якість повітря сприятлива"
-        air.europeanAqi <= 40 -> "Задовільна" to "Зазвичай без обмежень для прогулянок"
-        air.europeanAqi <= 60 -> "Помірна" to "Чутливим людям варто звернути увагу"
-        air.europeanAqi <= 80 -> "Погана" to "Чутливим людям краще зменшити навантаження надворі"
-        air.europeanAqi <= 100 -> "Дуже погана" to "Рекомендується обмежити тривале перебування надворі"
-        else -> "Надзвичайно погана" to "Варто уникати тривалого перебування надворі"
+    val aqi = air.europeanAqi.coerceAtLeast(0)
+    val (label, advice, levelColor) = when {
+        aqi <= 20 -> Triple("Добра", "Якість повітря сприятлива", Color(0xFF63C98A))
+        aqi <= 40 -> Triple("Задовільна", "Зазвичай без обмежень для прогулянок", Color(0xFFA8CE65))
+        aqi <= 60 -> Triple("Помірна", "Чутливим людям варто звернути увагу", Color(0xFFF0C65B))
+        aqi <= 80 -> Triple("Погана", "Чутливим людям краще зменшити навантаження надворі", Color(0xFFEE9854))
+        aqi <= 100 -> Triple("Дуже погана", "Рекомендується обмежити тривале перебування надворі", Color(0xFFE66D68))
+        else -> Triple("Надзвичайно погана", "Варто уникати тривалого перебування надворі", Color(0xFFB66ACB))
     }
+    val markerFraction = (aqi.coerceAtMost(120) / 100f).coerceIn(0f, 1f)
 
     Column(
         modifier = modifier
@@ -526,47 +529,61 @@ fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
             .background(Color.White.copy(alpha = 0.13f))
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "ЯКІСТЬ ПОВІТРЯ",
-                    color = mutedWhite,
-                    fontSize = 12.sp,
-                    letterSpacing = 1.8.sp
-                )
+                Text("ЯКІСТЬ ПОВІТРЯ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.8.sp)
                 Spacer(Modifier.height(5.dp))
-                Text(label, color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                Text(label, color = levelColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Text(advice, color = mutedWhite, fontSize = 12.sp)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    air.europeanAqi.toString(),
-                    color = cream,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Light
-                )
+                Text(aqi.toString(), color = levelColor, fontSize = 36.sp, fontWeight = FontWeight.Light)
                 Text("Європейський AQI", color = mutedWhite, fontSize = 10.sp)
             }
         }
-        Spacer(Modifier.height(14.dp))
+
+        Spacer(Modifier.height(17.dp))
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(18.dp)) {
+            val markerX = (maxWidth - 12.dp) * markerFraction
+            Row(
+                modifier = Modifier.fillMaxWidth().height(9.dp).align(Alignment.Center)
+                    .clip(RoundedCornerShape(50)),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                listOf(
+                    Color(0xFF63C98A), Color(0xFFA8CE65), Color(0xFFF0C65B),
+                    Color(0xFFEE9854), Color(0xFFE66D68)
+                ).forEach { segmentColor ->
+                    Box(Modifier.weight(1f).fillMaxHeight().background(segmentColor))
+                }
+            }
+            Box(
+                modifier = Modifier.offset(x = markerX).size(width = 12.dp, height = 18.dp)
+                    .clip(RoundedCornerShape(50)).background(Color.White)
+                    .align(Alignment.CenterStart)
+            )
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf("0", "20", "40", "60", "80", "100+").forEach {
+                Text(it, color = mutedWhite, fontSize = 9.sp)
+            }
+        }
+
+        Spacer(Modifier.height(13.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.18f))
-        Spacer(Modifier.height(11.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
                 Text("PM2.5", color = mutedWhite, fontSize = 11.sp)
                 Text("${"%.1f".format(Locale.US, air.pm25)} µg/m³", color = cream, fontSize = 16.sp)
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Text("PM10", color = mutedWhite, fontSize = 11.sp)
                 Text("${"%.1f".format(Locale.US, air.pm10)} µg/m³", color = cream, fontSize = 16.sp)
             }
         }
+        Spacer(Modifier.height(8.dp))
+        Text("Дані на ${air.updatedAt}", color = mutedWhite, fontSize = 10.sp)
     }
 }
 
@@ -715,10 +732,13 @@ private fun fetchAirQuality(lat: Double, lon: Double): AirQuality? {
     try {
         val body = connection.inputStream.bufferedReader().use { it.readText() }
         val current = JSONObject(body).getJSONObject("current")
+        val observationTime = current.optString("time", "")
+        val displayTime = observationTime.substringAfter("T", observationTime).take(5)
         return AirQuality(
             europeanAqi = current.getDouble("european_aqi").toInt(),
             pm25 = current.getDouble("pm2_5"),
-            pm10 = current.getDouble("pm10")
+            pm10 = current.getDouble("pm10"),
+            updatedAt = displayTime.ifBlank { "час невідомий" }
         )
     } finally {
         connection.disconnect()
