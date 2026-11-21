@@ -310,10 +310,8 @@ class WeatherLocationService : Service() {
 
     private fun createTemperatureIcon(): Icon {
         // Draw a high-resolution, transparent temperature glyph.
-        // DENSITY_NONE prevents Android from shrinking the bitmap based on screen DPI.
-        val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply {
-            density = android.util.DisplayMetrics.DENSITY_NONE
-        }
+        // Leave bitmap density at its default value for Android notification scaling.
+        val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
         val label = currentTemperature
