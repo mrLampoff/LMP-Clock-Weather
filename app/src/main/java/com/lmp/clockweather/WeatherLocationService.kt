@@ -23,11 +23,19 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.widget.RemoteViews
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import kotlin.concurrent.thread
+
+private data class NotificationHour(
+    val time: String,
+    val temperature: Int,
+    val precipitation: Int,
+    val weatherCode: Int
+)
 
 class WeatherLocationService : Service() {
 
@@ -44,6 +52,7 @@ class WeatherLocationService : Service() {
     private var currentTemperature = "--°"
     private var currentHigh = "--°"
     private var currentLow = "--°"
+    private var hourlyForecast: List<NotificationHour> = emptyList()
 
     private val listener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -190,7 +199,7 @@ class WeatherLocationService : Service() {
                     "?latitude=${location.latitude}" +
                     "&longitude=${location.longitude}" +
                     "&current=temperature_2m,weather_code,wind_speed_10m" +
-                    "&hourly=precipitation_probability,weather_code,wind_speed_10m" +
+                    "&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m" +
                     "&daily=temperature_2m_max,temperature_2m_min,weather_code,wind_speed_10m_max" +
                     "&timezone=auto&forecast_days=1"
 
@@ -213,6 +222,22 @@ class WeatherLocationService : Service() {
 
                 val current = json.getJSONObject("current")
                 val daily = json.getJSONObject("daily")
+                val hourly = json.getJSONObject("hourly")
+                val hourlyTimes = hourly.getJSONArray("time")
+                val hourlyTemps = hourly.getJSONArray("temperature_2m")
+                val hourlyRain = hourly.getJSONArray("precipitation_probability")
+                val hourlyCodes = hourly.getJSONArray("weather_code")
+                val currentHour = current.getString("time").take(13)
+                val firstHour = (0 until hourlyTimes.length())
+                    .firstOrNull { hourlyTimes.getString(it).startsWith(currentHour) } ?: 0
+                val nextHours = (firstHour until minOf(firstHour + 6, hourlyTimes.length())).map { index ->
+                    NotificationHour(
+                        time = hourlyTimes.getString(index).substringAfter("T"),
+                        temperature = hourlyTemps.getDouble(index).toInt(),
+                        precipitation = hourlyRain.getInt(index),
+                        weatherCode = hourlyCodes.getInt(index)
+                    )
+                }
 
                 // Check forecast-based weather alerts without changing the service notification.
                 WeatherAlertManager.checkAndNotify(this, json, city)
@@ -231,6 +256,7 @@ class WeatherLocationService : Service() {
                     currentTemperature = "${temp}°"
                     currentHigh = "${high}°"
                     currentLow = "${low}°"
+                    hourlyForecast = nextHours
                     updateNotification()
                 }
 
@@ -288,17 +314,50 @@ class WeatherLocationService : Service() {
             Notification.Builder(this)
         }
 
+        val expandedView = RemoteViews(packageName, R.layout.weather_notification_expanded).apply {
+            setTextViewText(R.id.notification_city, "LMP Weather · $currentCity")
+            setTextViewText(R.id.notification_current, currentTemperature)
+            setTextViewText(R.id.notification_daily, "Мін. $currentLow   ·   Макс. $currentHigh")
+            setTextViewText(R.id.notification_forecast_label, "ПОГОДИННИЙ ПРОГНОЗ")
+
+            val timeIds = intArrayOf(
+                R.id.forecast_time_0, R.id.forecast_time_1, R.id.forecast_time_2,
+                R.id.forecast_time_3, R.id.forecast_time_4, R.id.forecast_time_5
+            )
+            val rainIds = intArrayOf(
+                R.id.forecast_rain_0, R.id.forecast_rain_1, R.id.forecast_rain_2,
+                R.id.forecast_rain_3, R.id.forecast_rain_4, R.id.forecast_rain_5
+            )
+            val iconIds = intArrayOf(
+                R.id.forecast_icon_0, R.id.forecast_icon_1, R.id.forecast_icon_2,
+                R.id.forecast_icon_3, R.id.forecast_icon_4, R.id.forecast_icon_5
+            )
+            val tempIds = intArrayOf(
+                R.id.forecast_temp_0, R.id.forecast_temp_1, R.id.forecast_temp_2,
+                R.id.forecast_temp_3, R.id.forecast_temp_4, R.id.forecast_temp_5
+            )
+
+            for (index in 0 until 6) {
+                val hour = hourlyForecast.getOrNull(index)
+                if (hour != null) {
+                    setTextViewText(timeIds[index], hour.time)
+                    setTextViewText(rainIds[index], "${hour.precipitation}%")
+                    setTextViewText(iconIds[index], weatherEmoji(hour.weatherCode))
+                    setTextViewText(tempIds[index], "${hour.temperature}°")
+                } else {
+                    setTextViewText(timeIds[index], "—")
+                    setTextViewText(rainIds[index], "")
+                    setTextViewText(iconIds[index], "")
+                    setTextViewText(tempIds[index], "")
+                }
+            }
+        }
+
         return builder
             .setSmallIcon(createTemperatureIcon())
             .setContentTitle("LMP Weather · $currentCity")
             .setContentText(content)
-            .setStyle(
-                Notification.BigTextStyle().bigText(
-                    "$currentTemperature · $currentCity\n" +
-                    "Мінімум: $currentLow · Максимум: $currentHigh\n" +
-                    "Фонове оновлення активне"
-                )
-            )
+            .setCustomBigContentView(expandedView)
             .setContentIntent(openPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -307,6 +366,18 @@ class WeatherLocationService : Service() {
             .build()
     }
 
+
+    private fun weatherEmoji(code: Int): String = when (code) {
+        0 -> "☀️"
+        1, 2 -> "🌤️"
+        3 -> "☁️"
+        45, 48 -> "🌫️"
+        51, 53, 55, 56, 57 -> "🌦️"
+        61, 63, 65, 66, 67, 80, 81, 82 -> "🌧️"
+        71, 73, 75, 77, 85, 86 -> "❄️"
+        95, 96, 99 -> "⛈️"
+        else -> "🌡️"
+    }
 
     private fun createTemperatureIcon(): Icon {
         // Fill as much of Android's fixed status-bar icon area as possible.
