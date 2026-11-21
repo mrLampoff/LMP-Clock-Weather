@@ -40,10 +40,8 @@ class WeatherLocationService : Service() {
 
     private lateinit var locationManager: LocationManager
     private val handler = Handler(Looper.getMainLooper())
-
     private var currentCity = "Визначаємо місто…"
     private var currentTemperature = "--°"
-    private var currentStatusTemperature = "--°"
     private var currentHigh = "--°"
     private var currentLow = "--°"
 
@@ -111,21 +109,21 @@ class WeatherLocationService : Service() {
     }
 
     private fun hasLocationPermission(): Boolean {
-        val fineGranted =
-            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED
+    val fineGranted =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
-        val coarseGranted =
-            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED
+    val coarseGranted =
+        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
-        val backgroundGranted =
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-                checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED
+    val backgroundGranted =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+        checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
-        return (fineGranted || coarseGranted) && backgroundGranted
-    }
+    return (fineGranted || coarseGranted) && backgroundGranted
+}
 
     private fun getLastLocation() {
         if (!hasLocationPermission()) return
@@ -150,50 +148,51 @@ class WeatherLocationService : Service() {
     private fun updateWeather(location: Location) {
         thread {
             try {
-                val city = try {
-                    // Координати центру Десни
-                    val desnaLatitude = 50.9311535
-                    val desnaLongitude = 30.75695
+               val city = try {
+    // Координати центру Десни
+    val desnaLatitude = 50.9311535
+    val desnaLongitude = 30.75695
 
-                    // Перевіряємо відстань до Десни
-                    val results = FloatArray(1)
+    // Перевіряємо відстань до Десни
+    val results = FloatArray(1)
 
-                    Location.distanceBetween(
-                        location.latitude,
-                        location.longitude,
-                        desnaLatitude,
-                        desnaLongitude,
-                        results
-                    )
+    Location.distanceBetween(
+        location.latitude,
+        location.longitude,
+        desnaLatitude,
+        desnaLongitude,
+        results
+    )
 
-                    if (results[0] <= 2000f) {
-                        "Десна"
-                    } else {
-                        val geocoder = Geocoder(this, Locale("uk", "UA"))
+    if (results[0] <= 2000f) {
+        "Десна"
+    } else {
+        val geocoder = Geocoder(this, Locale("uk", "UA"))
 
-                        @Suppress("DEPRECATION")
-                        val address = geocoder.getFromLocation(
-                            location.latitude,
-                            location.longitude,
-                            5
-                        )?.firstOrNull()
+        @Suppress("DEPRECATION")
+        val address = geocoder.getFromLocation(
+            location.latitude,
+            location.longitude,
+            5
+        )?.firstOrNull()
 
-                        address?.locality
-                            ?: address?.subAdminArea
-                            ?: address?.adminArea
-                            ?: "Моє місцезнаходження"
-                    }
-                } catch (_: Exception) {
-                    "Моє місцезнаходження"
-                }
+        address?.locality
+            ?: address?.subAdminArea
+            ?: address?.adminArea
+            ?: "Моє місцезнаходження"
+    }
+} catch (_: Exception) {
+    "Моє місцезнаходження"
+}
 
                 val endpoint =
                     "https://api.open-meteo.com/v1/forecast" +
-                        "?latitude=${location.latitude}" +
-                        "&longitude=${location.longitude}" +
-                        "&current=temperature_2m" +
-                        "&daily=temperature_2m_max,temperature_2m_min" +
-                        "&timezone=auto&forecast_days=1"
+                    "?latitude=${location.latitude}" +
+                    "&longitude=${location.longitude}" +
+                    "&current=temperature_2m,weather_code,wind_speed_10m" +
+                    "&hourly=precipitation_probability,weather_code,wind_speed_10m" +
+                    "&daily=temperature_2m_max,temperature_2m_min,weather_code,wind_speed_10m_max" +
+                    "&timezone=auto&forecast_days=1"
 
                 val connection =
                     (URL(endpoint).openConnection() as HttpURLConnection).apply {
@@ -215,6 +214,9 @@ class WeatherLocationService : Service() {
                 val current = json.getJSONObject("current")
                 val daily = json.getJSONObject("daily")
 
+                // Check forecast-based weather alerts without changing the service notification.
+                WeatherAlertManager.checkAndNotify(this, json, city)
+
                 val temp = current.getDouble("temperature_2m").toInt()
                 val high = daily.getJSONArray("temperature_2m_max")
                     .getDouble(0).toInt()
@@ -226,19 +228,9 @@ class WeatherLocationService : Service() {
 
                 handler.post {
                     currentCity = city
-
-                    currentTemperature =
-                        "${if (temp > 0) "+" else ""}${temp}°"
-
-                    // Для статус-іконки прибираємо знак плюс.
-                    currentStatusTemperature = "${temp}°"
-
-                    currentHigh =
-                        "${if (high > 0) "+" else ""}${high}°"
-
-                    currentLow =
-                        "${if (low > 0) "+" else ""}${low}°"
-
+                    currentTemperature = "${if (temp > 0) "+" else ""}${temp}°"
+                    currentHigh = "${if (high > 0) "+" else ""}${high}°"
+                    currentLow = "${if (low > 0) "+" else ""}${low}°"
                     updateNotification()
                 }
 
@@ -263,14 +255,12 @@ class WeatherLocationService : Service() {
 
             val manager =
                 getSystemService(NotificationManager::class.java)
-
             manager.createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(message: String? = null): Notification {
         val openIntent = Intent(this, MainActivity::class.java)
-
         val openPendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -289,8 +279,7 @@ class WeatherLocationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val content =
-            message ?: "$currentTemperature · $currentCity · Мін. $currentLow · Макс. $currentHigh"
+        val content = message ?: "$currentTemperature · $currentCity · Мін. $currentLow · Макс. $currentHigh"
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -306,8 +295,8 @@ class WeatherLocationService : Service() {
             .setStyle(
                 Notification.BigTextStyle().bigText(
                     "$currentTemperature · $currentCity\n" +
-                        "Мінімум: $currentLow · Максимум: $currentHigh\n" +
-                        "Фонове оновлення активне"
+                    "Мінімум: $currentLow · Максимум: $currentHigh\n" +
+                    "Фонове оновлення активне"
                 )
             )
             .setContentIntent(openPendingIntent)
@@ -318,46 +307,31 @@ class WeatherLocationService : Service() {
             .build()
     }
 
+
     private fun createTemperatureIcon(): Icon {
-        // Максимально великий напис температури без знака плюс.
-        val bitmap = Bitmap.createBitmap(
-            96,
-            96,
-            Bitmap.Config.ARGB_8888
-        ).apply {
+        // Android renders small notification icons as a monochrome alpha mask.
+        // Draw only the temperature text on a transparent bitmap.
+        val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply {
             density = resources.displayMetrics.densityDpi
         }
-
         val canvas = Canvas(bitmap)
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.create(
-                "sans-serif-condensed",
-                Typeface.BOLD
-            )
-            textSize = 88f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
 
-        val label = currentStatusTemperature
-        val availableWidth = bitmap.width - 2f
-        val measuredWidth = paint.measureText(label)
-
-        if (measuredWidth > availableWidth) {
-            paint.textSize *= availableWidth / measuredWidth
+        val label = currentTemperature
+        paint.textSize = when {
+            label.length >= 5 -> 13f
+            label.length == 4 -> 15f
+            else -> 19f
         }
 
         val metrics = paint.fontMetrics
-        val baseline =
-            (bitmap.height - metrics.ascent - metrics.descent) / 2f
-
-        canvas.drawText(
-            label,
-            bitmap.width / 2f,
-            baseline,
-            paint
-        )
+        val baseline = (bitmap.height - metrics.ascent - metrics.descent) / 2f
+        canvas.drawText(label, bitmap.width / 2f, baseline, paint)
 
         return Icon.createWithBitmap(bitmap)
     }
