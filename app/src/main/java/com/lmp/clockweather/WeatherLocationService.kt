@@ -228,9 +228,9 @@ class WeatherLocationService : Service() {
 
                 handler.post {
                     currentCity = city
-                    currentTemperature = "${if (temp > 0) "+" else ""}${temp}°"
-                    currentHigh = "${if (high > 0) "+" else ""}${high}°"
-                    currentLow = "${if (low > 0) "+" else ""}${low}°"
+                    currentTemperature = "${temp}°"
+                    currentHigh = "${high}°"
+                    currentLow = "${low}°"
                     updateNotification()
                 }
 
@@ -309,27 +309,36 @@ class WeatherLocationService : Service() {
 
 
     private fun createTemperatureIcon(): Icon {
-        // Draw a high-resolution, transparent temperature glyph.
-        // Leave bitmap density at its default value for Android notification scaling.
+        // Fill as much of Android's fixed status-bar icon area as possible.
+        // The OS still controls the final displayed icon bounds.
         val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-
         val label = currentTemperature
+
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-            textSize = when {
-                label.length >= 5 -> 34f
-                label.length == 4 -> 40f
-                else -> 48f
-            }
-            // A small stroke keeps thin glyph edges visible after status-bar scaling.
-            style = Paint.Style.FILL_AND_STROKE
-            strokeWidth = 1.2f
+            style = Paint.Style.FILL
         }
 
-        val metrics = paint.fontMetrics
+        // Fit the temperature glyph to almost the full square, including
+        // wider negative values such as "-12°".
+        paint.textSize = 88f
+        val maxWidth = 92f
+        val measuredWidth = paint.measureText(label).coerceAtLeast(1f)
+        if (measuredWidth > maxWidth) {
+            paint.textSize *= maxWidth / measuredWidth
+        }
+
+        var metrics = paint.fontMetrics
+        val glyphHeight = metrics.descent - metrics.ascent
+        val maxHeight = 88f
+        if (glyphHeight > maxHeight) {
+            paint.textSize *= maxHeight / glyphHeight
+            metrics = paint.fontMetrics
+        }
+
         val baseline = (bitmap.height - metrics.ascent - metrics.descent) / 2f
         canvas.drawText(label, bitmap.width / 2f, baseline, paint)
 
