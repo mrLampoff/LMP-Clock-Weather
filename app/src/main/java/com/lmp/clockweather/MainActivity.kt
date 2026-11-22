@@ -80,6 +80,8 @@ data class WeatherNow(
     val code: Int,
     val high: Int,
     val low: Int,
+    val pressureHpa: Double,
+    val windDirection: Int,
     val city: String = "Київ"
 )
 
@@ -471,6 +473,11 @@ fun MainWeatherScreen(
                     WeatherMetric("Вологість", "${weather.now.humidity}%", R.drawable.weather_humidity, Modifier.weight(1f))
                     WeatherMetric("Вітер", "${weather.now.wind} км/год", R.drawable.weather_wind, Modifier.weight(1f))
                 }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PressureCard(weather.now.pressureHpa, Modifier.weight(1f))
+                    WindDirectionCard(weather.now.windDirection, Modifier.weight(1f))
+                }
                 Spacer(Modifier.height(18.dp))
                 weather.airQuality?.let { air ->
                     AirQualityCard(air, Modifier.fillMaxWidth())
@@ -733,6 +740,54 @@ fun WeatherMetric(title: String, value: String, iconRes: Int, modifier: Modifier
     }
 }
 
+
+@Composable
+private fun PressureCard(pressureHpa: Double, modifier: Modifier = Modifier) {
+    val pressureMmhg = pressureHpa * 0.750061683
+    val label = when {
+        pressureHpa < 1000.0 -> "Знижений"
+        pressureHpa > 1020.0 -> "Підвищений"
+        else -> "Нормальний"
+    }
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.13f)).padding(15.dp)
+    ) {
+        Text("АТМОСФЕРНИЙ ТИСК", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        Text("${pressureMmhg.toInt()} мм", color = cream, fontSize = 23.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = mutedWhite, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
+    val directions = listOf("Пн", "Пн-Сх", "Сх", "Пд-Сх", "Пд", "Пд-Зх", "Зх", "Пн-Зх")
+    val normalized = ((direction % 360) + 360) % 360
+    val compass = directions[((normalized + 22) / 45) % 8]
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.13f)).padding(15.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("НАПРЯМОК ВІТРУ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(3.dp))
+        Canvas(Modifier.size(43.dp)) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val radius = size.minDimension * 0.40f
+            drawCircle(color = Color.White.copy(alpha = 0.28f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
+            val radians = Math.toRadians(direction.toDouble())
+            val dx = kotlin.math.sin(radians).toFloat()
+            val dy = -kotlin.math.cos(radians).toFloat()
+            val tip = Offset(center.x + dx * radius * 0.82f, center.y + dy * radius * 0.82f)
+            drawLine(color = Color(0xFFFFC978), start = center, end = tip, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+            drawCircle(color = cream, radius = 3.dp.toPx(), center = center)
+        }
+        Text(compass, color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+        Text("$normalized°", color = mutedWhite, fontSize = 11.sp)
+    }
+}
+
 @Composable
 fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF51404A), Color(0xFF252A35)))).padding(24.dp)) {
@@ -746,7 +801,7 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
             Switch(checked = useCelsius, onCheckedChange = onCelsiusChange)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Версія 1.5", color = mutedWhite)
+        Text("Версія 1.6", color = mutedWhite)
         Text("Погодні дані надає Open-Meteo", color = mutedWhite, fontSize = 12.sp)
     }
 }
@@ -850,7 +905,7 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
 }
 
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,uv_index&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -901,7 +956,8 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         return WeatherBundle(
             WeatherNow(current.getDouble("temperature_2m").toInt(), current.getDouble("apparent_temperature").toInt(),
                 current.getInt("relative_humidity_2m"), current.getDouble("wind_speed_10m").toInt(),
-                current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(), city),
+                current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(),
+                current.optDouble("surface_pressure", 1013.25), current.optInt("wind_direction_10m", 0), city),
             days,
             hours,
             airQuality,
