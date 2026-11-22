@@ -108,6 +108,16 @@ data class SolarUv(
     val maxUv: Double
 )
 
+data class DailyOutlook(
+    val high: Int,
+    val low: Int,
+    val weatherCode: Int,
+    val rainMm: Double,
+    val snowCm: Double,
+    val precipitationProbability: Int,
+    val maxWind: Int
+)
+
 data class WeatherBundle(
     val now: WeatherNow,
     val days: List<DayForecast>,
@@ -115,6 +125,8 @@ data class WeatherBundle(
     val hours48: List<HourForecast>,
     val airQuality: AirQuality?,
     val solarUv: SolarUv,
+    val todayOutlook: DailyOutlook,
+    val tomorrowOutlook: DailyOutlook,
     val dailyRainMm: Double = 0.0,
     val dailySnowfallCm: Double = 0.0
 )
@@ -534,6 +546,13 @@ fun MainWeatherScreen(
                     useCelsius = useCelsius,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(18.dp))
+                TodayTomorrowCard(
+                    today = weather.todayOutlook,
+                    tomorrow = weather.tomorrowOutlook,
+                    useCelsius = useCelsius,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(26.dp))
                 Text("ПРОГНОЗ НА 7 ДНІВ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
@@ -559,6 +578,88 @@ fun MainWeatherScreen(
             Text("Дані: Open-Meteo", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
             Text("LMP Clock & Weather", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
         }
+    }
+}
+
+@Composable
+fun TodayTomorrowCard(
+    today: DailyOutlook,
+    tomorrow: DailyOutlook,
+    useCelsius: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val temperatureDifference = tomorrow.high - today.high
+    val rainExpected = tomorrow.rainMm >= 1.0 || tomorrow.precipitationProbability >= 40
+    val windy = tomorrow.maxWind >= 30
+    val advice = when {
+        tomorrow.weatherCode in listOf(95, 96, 99) -> "Завтра можлива гроза. Стеж за оновленнями прогнозу."
+        tomorrow.snowCm >= 1.0 -> "Завтра можливий сніг. Обирай тепле взуття та одяг."
+        rainExpected -> "Завтра можливий дощ. Парасолька може стати у пригоді."
+        windy -> "Завтра буде вітряно. Одягнися з урахуванням вітру."
+        tomorrow.high <= 5 -> "Завтра прохолодно. Варто вдягнутися тепліше."
+        tomorrow.high >= 27 -> "Завтра тепло. Не забудь про воду та захист від сонця."
+        else -> "Завтра умови сприятливі для звичних планів надворі."
+    }
+    val changeText = when {
+        temperatureDifference > 1 -> "Тепліше на $temperatureDifference°"
+        temperatureDifference < -1 -> "Холодніше на ${-temperatureDifference}°"
+        else -> "Температура майже не зміниться"
+    }
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .padding(16.dp)
+    ) {
+        Text("СЬОГОДНІ ТА ЗАВТРА", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.4.sp)
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            DailyOutlookColumn("СЬОГОДНІ", today, useCelsius, Modifier.weight(1f))
+            DailyOutlookColumn("ЗАВТРА", tomorrow, useCelsius, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(changeText, color = cream, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(8.dp))
+        Text("ПОРАДА НА ЗАВТРА", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(advice, color = cream, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun DailyOutlookColumn(
+    title: String,
+    outlook: DailyOutlook,
+    useCelsius: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.08f))
+            .padding(12.dp)
+    ) {
+        Text(title, color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(7.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(weatherIconRes(outlook.weatherCode)),
+                contentDescription = weatherDescription(outlook.weatherCode),
+                modifier = Modifier.size(34.dp)
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                "${formatTemp(outlook.high, useCelsius)}° / ${formatTemp(outlook.low, useCelsius)}°",
+                color = cream,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(Modifier.height(7.dp))
+        Text("Опади: ${"%.1f".format(Locale.US, outlook.rainMm)} мм", color = mutedWhite, fontSize = 11.sp)
+        Text("Імовірність: ${outlook.precipitationProbability}%", color = mutedWhite, fontSize = 11.sp)
+        Text("Вітер до ${outlook.maxWind} км/г", color = mutedWhite, fontSize = 11.sp)
     }
 }
 
@@ -1069,7 +1170,7 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
 }
 
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -1130,6 +1231,19 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
             currentUv = current.optDouble("uv_index", 0.0),
             maxUv = daily.getJSONArray("uv_index_max").optDouble(0, 0.0)
         )
+        val rainSums = daily.optJSONArray("rain_sum")
+        val snowSums = daily.optJSONArray("snowfall_sum")
+        val precipitationMax = daily.optJSONArray("precipitation_probability_max")
+        val windMax = daily.optJSONArray("wind_speed_10m_max")
+        fun dailyOutlook(index: Int): DailyOutlook = DailyOutlook(
+            high = highs.optDouble(index, 0.0).toInt(),
+            low = lows.optDouble(index, 0.0).toInt(),
+            weatherCode = codes.optInt(index, 0),
+            rainMm = rainSums?.optDouble(index, 0.0) ?: 0.0,
+            snowCm = snowSums?.optDouble(index, 0.0) ?: 0.0,
+            precipitationProbability = precipitationMax?.optInt(index, 0) ?: 0,
+            maxWind = windMax?.optDouble(index, 0.0)?.toInt() ?: 0
+        )
 
         return WeatherBundle(
             WeatherNow(current.getDouble("temperature_2m").toInt(), current.getDouble("apparent_temperature").toInt(),
@@ -1141,8 +1255,10 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
             hours48,
             airQuality,
             solarUv,
-            dailyRainMm = daily.optJSONArray("rain_sum")?.optDouble(0, 0.0) ?: 0.0,
-            dailySnowfallCm = daily.optJSONArray("snowfall_sum")?.optDouble(0, 0.0) ?: 0.0
+            todayOutlook = dailyOutlook(0),
+            tomorrowOutlook = dailyOutlook(1),
+            dailyRainMm = rainSums?.optDouble(0, 0.0) ?: 0.0,
+            dailySnowfallCm = snowSums?.optDouble(0, 0.0) ?: 0.0
         )
     } finally { connection.disconnect() }
 }
