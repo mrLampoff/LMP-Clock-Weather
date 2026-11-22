@@ -94,11 +94,20 @@ data class AirQuality(
     val updatedAt: String
 )
 
+data class SolarUv(
+    val sunrise: String,
+    val sunset: String,
+    val daylight: String,
+    val currentUv: Double,
+    val maxUv: Double
+)
+
 data class WeatherBundle(
     val now: WeatherNow,
     val days: List<DayForecast>,
     val hours: List<HourForecast>,
-    val airQuality: AirQuality?
+    val airQuality: AirQuality?,
+    val solarUv: SolarUv
 )
 
 @Composable
@@ -465,8 +474,10 @@ fun MainWeatherScreen(
                 Spacer(Modifier.height(18.dp))
                 weather.airQuality?.let { air ->
                     AirQualityCard(air, Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(18.dp))
                 }
+                SolarUvCard(weather.solarUv, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(24.dp))
                 if (weather.hours.size >= 2) {
                     Spacer(Modifier.height(2.dp))
                     TemperatureTrendCard(
@@ -735,7 +746,7 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
             Switch(checked = useCelsius, onCheckedChange = onCelsiusChange)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Версія 1.4", color = mutedWhite)
+        Text("Версія 1.5", color = mutedWhite)
         Text("Погодні дані надає Open-Meteo", color = mutedWhite, fontSize = 12.sp)
     }
 }
@@ -793,8 +804,53 @@ private fun getFreshLocation(
         onResult(null)
     }
 }
+@Composable
+fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
+    val (uvLabel, uvAdvice, uvColor) = when {
+        solar.maxUv < 3 -> Triple("Низький", "Зазвичай достатньо звичайних заходів захисту", Color(0xFF63C98A))
+        solar.maxUv < 6 -> Triple("Помірний", "За тривалого перебування надворі потрібен захист", Color(0xFFF0C65B))
+        solar.maxUv < 8 -> Triple("Високий", "Шукай тінь, одягай окуляри та використовуй SPF 30+", Color(0xFFEE9854))
+        solar.maxUv < 11 -> Triple("Дуже високий", "Обмеж перебування на сонці опівдні, використовуй SPF 30+", Color(0xFFE66D68))
+        else -> Triple("Екстремальний", "Уникай прямого сонця, шукай тінь та використовуй SPF 50+", Color(0xFFB66ACB))
+    }
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f)).padding(16.dp)
+    ) {
+        Text("СОНЦЕ ТА УФ-ІНДЕКС", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.8.sp)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("Схід сонця", color = mutedWhite, fontSize = 11.sp)
+                Text("☀  ${solar.sunrise}", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Захід сонця", color = mutedWhite, fontSize = 11.sp)
+                Text("🌇  ${solar.sunset}", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Світловий день: ${solar.daylight}", color = mutedWhite, fontSize = 12.sp)
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.18f))
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(uvLabel, color = uvColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text("Максимум за день: ${"%.1f".format(Locale.US, solar.maxUv)}", color = mutedWhite, fontSize = 11.sp)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${"%.1f".format(Locale.US, solar.currentUv)}", color = uvColor, fontSize = 38.sp, fontWeight = FontWeight.Light)
+                Text("УФ зараз", color = mutedWhite, fontSize = 10.sp)
+            }
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(uvAdvice, color = cream, fontSize = 12.sp)
+    }
+}
+
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,uv_index&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -829,6 +885,18 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         } catch (_: Exception) {
             null
         }
+        val sunrise = daily.getJSONArray("sunrise").getString(0).substringAfter("T").take(5)
+        val sunset = daily.getJSONArray("sunset").getString(0).substringAfter("T").take(5)
+        val sunriseParts = sunrise.split(":").map { it.toInt() }
+        val sunsetParts = sunset.split(":").map { it.toInt() }
+        val daylightMinutes = (sunsetParts[0] * 60 + sunsetParts[1]) - (sunriseParts[0] * 60 + sunriseParts[1])
+        val solarUv = SolarUv(
+            sunrise = sunrise,
+            sunset = sunset,
+            daylight = "${daylightMinutes / 60} год ${daylightMinutes % 60} хв",
+            currentUv = current.optDouble("uv_index", 0.0),
+            maxUv = daily.getJSONArray("uv_index_max").optDouble(0, 0.0)
+        )
 
         return WeatherBundle(
             WeatherNow(current.getDouble("temperature_2m").toInt(), current.getDouble("apparent_temperature").toInt(),
@@ -836,7 +904,8 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
                 current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(), city),
             days,
             hours,
-            airQuality
+            airQuality,
+            solarUv
         )
     } finally { connection.disconnect() }
 }
