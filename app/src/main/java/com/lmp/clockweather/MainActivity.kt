@@ -89,7 +89,8 @@ data class DayForecast(val day: String, val code: Int, val high: Int, val low: I
 
 data class HourForecast(
     val time: String, val temperature: Int, val code: Int, val precipitation: Int, val wind: Int,
-    val precipitationMm: Double = 0.0, val rainMm: Double = 0.0, val snowfallCm: Double = 0.0
+    val precipitationMm: Double = 0.0, val rainMm: Double = 0.0, val snowfallCm: Double = 0.0,
+    val cloudCover: Int = 0
 )
 
 data class AirQuality(
@@ -111,6 +112,7 @@ data class WeatherBundle(
     val now: WeatherNow,
     val days: List<DayForecast>,
     val hours: List<HourForecast>,
+    val hours48: List<HourForecast>,
     val airQuality: AirQuality?,
     val solarUv: SolarUv,
     val dailyRainMm: Double = 0.0,
@@ -526,6 +528,12 @@ fun MainWeatherScreen(
                         }
                     }
                 }
+                Spacer(Modifier.height(22.dp))
+                Forecast48Card(
+                    hours = weather.hours48,
+                    useCelsius = useCelsius,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(26.dp))
                 Text("ПРОГНОЗ НА 7 ДНІВ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
@@ -550,6 +558,76 @@ fun MainWeatherScreen(
             Spacer(Modifier.height(18.dp))
             Text("Дані: Open-Meteo", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
             Text("LMP Clock & Weather", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+fun Forecast48Card(
+    hours: List<HourForecast>,
+    useCelsius: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .padding(16.dp)
+    ) {
+        Text("ДЕТАЛЬНИЙ ПРОГНОЗ НА 48 ГОДИН", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.4.sp)
+        Spacer(Modifier.height(12.dp))
+        Text("ПЕРШІ 24 ГОДИНИ", color = cream, fontSize = 11.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        Forecast48Row(hours.take(24), useCelsius)
+        if (hours.size > 24) {
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.18f))
+            Spacer(Modifier.height(14.dp))
+            Text("НАСТУПНІ 24 ГОДИНИ", color = cream, fontSize = 11.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(8.dp))
+            Forecast48Row(hours.drop(24).take(24), useCelsius)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Для кожної години показано температуру, опади, вітер і хмарність",
+            color = mutedWhite,
+            fontSize = 10.sp
+        )
+    }
+}
+
+@Composable
+private fun Forecast48Row(hours: List<HourForecast>, useCelsius: Boolean) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(hours.size) { index ->
+            val hour = hours[index]
+            Column(
+                modifier = Modifier
+                    .width(76.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.09f))
+                    .padding(vertical = 10.dp, horizontal = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(hour.time, color = mutedWhite, fontSize = 12.sp)
+                Spacer(Modifier.height(6.dp))
+                Image(
+                    painter = painterResource(weatherIconRes(hour.code)),
+                    contentDescription = weatherDescription(hour.code),
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    "${formatTemp(hour.temperature, useCelsius)}°",
+                    color = cream,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(Modifier.height(5.dp))
+                Text("💧 ${hour.precipitation}%", color = mutedWhite, fontSize = 10.sp)
+                Text("Вітер ${hour.wind}", color = mutedWhite, fontSize = 9.sp)
+                Text("Хмари ${hour.cloudCover}%", color = mutedWhite, fontSize = 9.sp)
+            }
         }
     }
 }
@@ -887,7 +965,7 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
             Switch(checked = useCelsius, onCheckedChange = onCelsiusChange)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Версія 1.6", color = mutedWhite)
+        Text("Версія 1.8", color = mutedWhite)
         Text("Погодні дані надає Open-Meteo", color = mutedWhite, fontSize = 12.sp)
     }
 }
@@ -991,7 +1069,7 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
 }
 
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -1009,17 +1087,23 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         val hourlySnowfallCm = hourly.getJSONArray("snowfall")
         val hourlyCodes = hourly.getJSONArray("weather_code")
         val hourlyWind = hourly.getJSONArray("wind_speed_10m")
+        val hourlyCloudCover = hourly.optJSONArray("cloud_cover")
         val nowTime = root.getJSONObject("current").getString("time").take(13)
         val startHour = (0 until hourlyTimes.length()).firstOrNull { hourlyTimes.getString(it).startsWith(nowTime) } ?: 0
-        val hours = (startHour until minOf(startHour + 24, hourlyTimes.length())).map { i ->
+        fun hourForecastAt(i: Int): HourForecast {
             val timeLabel = hourlyTimes.getString(i).substringAfter("T")
-            HourForecast(
+            return HourForecast(
                 timeLabel, hourlyTemps.getDouble(i).toInt(), hourlyCodes.getInt(i),
                 hourlyRain.getInt(i), hourlyWind.getDouble(i).toInt(),
                 hourlyPrecipitation.optDouble(i, 0.0), hourlyRainMm.optDouble(i, 0.0),
-                hourlySnowfallCm.optDouble(i, 0.0)
+                hourlySnowfallCm.optDouble(i, 0.0),
+                hourlyCloudCover?.optInt(i, 0) ?: 0
             )
         }
+        val hours = (startHour until minOf(startHour + 24, hourlyTimes.length()))
+            .map { i -> hourForecastAt(i) }
+        val hours48 = (startHour until minOf(startHour + 48, hourlyTimes.length()))
+            .map { i -> hourForecastAt(i) }
         val times = daily.getJSONArray("time")
         val codes = daily.getJSONArray("weather_code")
         val highs = daily.getJSONArray("temperature_2m_max")
@@ -1054,6 +1138,7 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
                 current.optDouble("surface_pressure", 1013.25), current.optInt("wind_direction_10m", 0), city),
             days,
             hours,
+            hours48,
             airQuality,
             solarUv,
             dailyRainMm = daily.optJSONArray("rain_sum")?.optDouble(0, 0.0) ?: 0.0,
