@@ -90,7 +90,7 @@ data class DayForecast(val day: String, val code: Int, val high: Int, val low: I
 data class HourForecast(
     val time: String, val temperature: Int, val code: Int, val precipitation: Int, val wind: Int,
     val precipitationMm: Double = 0.0, val rainMm: Double = 0.0, val snowfallCm: Double = 0.0,
-    val cloudCover: Int = 0
+    val cloudCover: Int = 0, val uvIndex: Double = 0.0
 )
 
 data class AirQuality(
@@ -540,6 +540,12 @@ fun MainWeatherScreen(
                         }
                     }
                 }
+                Spacer(Modifier.height(18.dp))
+                BestOutdoorTimeCard(
+                    hours = weather.hours,
+                    useCelsius = useCelsius,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(22.dp))
                 Forecast48Card(
                     hours = weather.hours48,
@@ -577,6 +583,124 @@ fun MainWeatherScreen(
             Spacer(Modifier.height(18.dp))
             Text("Дані: Open-Meteo", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
             Text("LMP Clock & Weather", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+        }
+    }
+}
+
+private data class OutdoorWindow(
+    val start: String,
+    val end: String,
+    val score: Int,
+    val reason: String
+)
+
+private fun outdoorComfortScore(hour: HourForecast): Int {
+    val temperatureScore = when {
+        hour.temperature in 18..24 -> 100
+        hour.temperature in 15..27 -> 85
+        hour.temperature in 10..30 -> 65
+        hour.temperature in 5..34 -> 40
+        else -> 20
+    }
+    val windPenalty = when {
+        hour.wind <= 10 -> 0
+        hour.wind <= 20 -> 8
+        hour.wind <= 30 -> 20
+        else -> 35
+    }
+    val rainPenalty = when {
+        hour.precipitation >= 70 -> 55
+        hour.precipitation >= 40 -> 35
+        hour.precipitation >= 20 -> 18
+        else -> 0
+    }
+    val amountPenalty = (hour.precipitationMm * 12.0).toInt().coerceAtMost(35)
+    val uvPenalty = when {
+        hour.uvIndex >= 8 -> 25
+        hour.uvIndex >= 6 -> 18
+        hour.uvIndex >= 3 -> 8
+        else -> 0
+    }
+    return (temperatureScore - windPenalty - rainPenalty - amountPenalty - uvPenalty)
+        .coerceIn(0, 100)
+}
+
+private fun findBestOutdoorWindow(hours: List<HourForecast>): OutdoorWindow? {
+    if (hours.isEmpty()) return null
+    val windowSize = minOf(2, hours.size)
+    val candidates = (0..hours.size - windowSize).map { start ->
+        val slice = hours.subList(start, start + windowSize)
+        val score = (slice.map { outdoorComfortScore(it) }.average()).toInt()
+        Triple(start, slice, score)
+    }
+    val best = candidates.maxByOrNull { it.third } ?: return null
+    val firstHour = best.second.first()
+    val lastHour = best.second.last()
+    val endHour = (lastHour.time.substringBefore(":").toIntOrNull() ?: 0) + 1
+    val end = "%02d:00".format(Locale.US, endHour % 24)
+    val reason = when {
+        best.second.any { it.precipitation >= 40 || it.precipitationMm >= 0.5 } -> "У цей час можливі опади"
+        best.second.any { it.wind > 25 } -> "Врахуй поривчастий вітер"
+        best.second.any { it.uvIndex >= 6 } -> "Високий УФ-індекс, подбай про захист"
+        best.score >= 80 -> "Комфортні умови для прогулянки"
+        else -> "Це найкомфортніший проміжок серед доступних годин"
+    }
+    return OutdoorWindow(firstHour.time, end, best.third, reason)
+}
+
+@Composable
+fun BestOutdoorTimeCard(
+    hours: List<HourForecast>,
+    useCelsius: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val best = remember(hours) { findBestOutdoorWindow(hours) }
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .padding(16.dp)
+    ) {
+        Text("КОЛИ КРАЩЕ ВИЙТИ НАДВІР?", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.3.sp)
+        Spacer(Modifier.height(10.dp))
+        if (best == null) {
+            Text("Поки немає достатньо погодинних даних", color = cream, fontSize = 14.sp)
+        } else {
+            Text(
+                "${best.start} – ${best.end}",
+                color = cream,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(5.dp))
+            Text("Комфортність умов: ${best.score}/100", color = cream, fontSize = 14.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .padding(3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(best.score / 100f)
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF8BC9A2), Color(0xFFE6D18A))
+                            )
+                        )
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(best.reason, color = mutedWhite, fontSize = 12.sp)
+            Text(
+                "Оцінка за температурою, вітром, опадами та УФ-індексом. Це орієнтир, а не гарантія погоди.",
+                color = mutedWhite.copy(alpha = 0.75f),
+                fontSize = 10.sp
+            )
         }
     }
 }
@@ -1170,7 +1294,7 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
 }
 
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -1189,6 +1313,7 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         val hourlyCodes = hourly.getJSONArray("weather_code")
         val hourlyWind = hourly.getJSONArray("wind_speed_10m")
         val hourlyCloudCover = hourly.optJSONArray("cloud_cover")
+        val hourlyUvIndex = hourly.optJSONArray("uv_index")
         val nowTime = root.getJSONObject("current").getString("time").take(13)
         val startHour = (0 until hourlyTimes.length()).firstOrNull { hourlyTimes.getString(it).startsWith(nowTime) } ?: 0
         fun hourForecastAt(i: Int): HourForecast {
@@ -1198,7 +1323,8 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
                 hourlyRain.getInt(i), hourlyWind.getDouble(i).toInt(),
                 hourlyPrecipitation.optDouble(i, 0.0), hourlyRainMm.optDouble(i, 0.0),
                 hourlySnowfallCm.optDouble(i, 0.0),
-                hourlyCloudCover?.optInt(i, 0) ?: 0
+                hourlyCloudCover?.optInt(i, 0) ?: 0,
+                hourlyUvIndex?.optDouble(i, 0.0) ?: 0.0
             )
         }
         val hours = (startHour until minOf(startHour + 24, hourlyTimes.length()))
