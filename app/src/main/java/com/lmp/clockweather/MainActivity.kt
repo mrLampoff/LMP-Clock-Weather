@@ -642,7 +642,7 @@ private fun findBestOutdoorWindow(hours: List<HourForecast>): OutdoorWindow? {
         best.second.any { it.precipitation >= 40 || it.precipitationMm >= 0.5 } -> "У цей час можливі опади"
         best.second.any { it.wind > 25 } -> "Врахуй поривчастий вітер"
         best.second.any { it.uvIndex >= 6 } -> "Високий УФ-індекс, подбай про захист"
-        best.score >= 80 -> "Комфортні умови для прогулянки"
+        best.third >= 80 -> "Комфортні умови для прогулянки"
         else -> "Це найкомфортніший проміжок серед доступних годин"
     }
     return OutdoorWindow(firstHour.time, end, best.third, reason)
