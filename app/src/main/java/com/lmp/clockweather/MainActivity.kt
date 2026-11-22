@@ -21,6 +21,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -39,6 +40,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -462,6 +467,15 @@ fun MainWeatherScreen(
                     AirQualityCard(air, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(24.dp))
                 }
+                if (weather.hours.size >= 2) {
+                    Spacer(Modifier.height(2.dp))
+                    TemperatureTrendCard(
+                        hours = weather.hours,
+                        useCelsius = useCelsius,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(24.dp))
+                }
                 Text("ПОГОДИННИЙ ПРОГНОЗ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 4.dp)) {
@@ -506,6 +520,117 @@ fun MainWeatherScreen(
             Spacer(Modifier.height(18.dp))
             Text("Дані: Open-Meteo", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
             Text("LMP Clock & Weather", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+fun TemperatureTrendCard(
+    hours: List<HourForecast>,
+    useCelsius: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val values = hours.map { formatTemp(it.temperature, useCelsius).toFloat() }
+    val minTemp = values.minOrNull() ?: return
+    val maxTemp = values.maxOrNull() ?: return
+    val range = (maxTemp - minTemp).coerceAtLeast(2f)
+    val chartMin = minTemp - range * 0.18f
+    val chartMax = maxTemp + range * 0.18f
+    val lineColor = Color(0xFFFFD18A)
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .padding(16.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("ТЕМПЕРАТУРА НА 24 ГОДИНИ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("Зміна протягом доби", color = cream, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${maxTemp.toInt()}°", color = cream, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text("максимум", color = mutedWhite, fontSize = 10.sp)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Canvas(Modifier.fillMaxWidth().height(126.dp)) {
+            val left = 8.dp.toPx()
+            val right = size.width - 8.dp.toPx()
+            val top = 10.dp.toPx()
+            val bottom = size.height - 10.dp.toPx()
+            val plotWidth = (right - left).coerceAtLeast(1f)
+            val plotHeight = (bottom - top).coerceAtLeast(1f)
+
+            for (step in 0..2) {
+                val y = top + plotHeight * step / 2f
+                drawLine(
+                    color = Color.White.copy(alpha = 0.16f),
+                    start = Offset(left, y),
+                    end = Offset(right, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            val points = values.mapIndexed { index, value ->
+                val xFraction = index.toFloat() / (values.size - 1).coerceAtLeast(1)
+                val yFraction = ((chartMax - value) / (chartMax - chartMin)).coerceIn(0f, 1f)
+                Offset(left + plotWidth * xFraction, top + plotHeight * yFraction)
+            }
+
+            val linePath = Path().apply {
+                points.forEachIndexed { index, point ->
+                    if (index == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
+                }
+            }
+            val areaPath = Path().apply {
+                moveTo(points.first().x, bottom)
+                points.forEach { lineTo(it.x, it.y) }
+                lineTo(points.last().x, bottom)
+                close()
+            }
+
+            drawPath(
+                path = areaPath,
+                brush = Brush.verticalGradient(
+                    colors = listOf(lineColor.copy(alpha = 0.32f), lineColor.copy(alpha = 0.015f)),
+                    startY = top,
+                    endY = bottom
+                )
+            )
+            drawPath(path = linePath, color = lineColor, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+
+            val currentPoint = points.first()
+            drawCircle(Color.White.copy(alpha = 0.35f), radius = 8.dp.toPx(), center = currentPoint)
+            drawCircle(Color.White, radius = 4.dp.toPx(), center = currentPoint)
+            drawCircle(lineColor, radius = 3.dp.toPx(), center = points.last())
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(hours.first().time, color = mutedWhite, fontSize = 10.sp)
+            Text(hours[hours.size / 2].time, color = mutedWhite, fontSize = 10.sp)
+            Text(hours.last().time, color = mutedWhite, fontSize = 10.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.18f))
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("МІНІМУМ", color = mutedWhite, fontSize = 9.sp)
+                Text("${minTemp.toInt()}°", color = cream, fontSize = 17.sp)
+            }
+            Text("● Поточна година", color = mutedWhite, fontSize = 10.sp)
+            Column(horizontalAlignment = Alignment.End) {
+                Text("МАКСИМУМ", color = mutedWhite, fontSize = 9.sp)
+                Text("${maxTemp.toInt()}°", color = cream, fontSize = 17.sp)
+            }
         }
     }
 }
@@ -610,7 +735,7 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
             Switch(checked = useCelsius, onCheckedChange = onCelsiusChange)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Версія 1.0", color = mutedWhite)
+        Text("Версія 1.4", color = mutedWhite)
         Text("Погодні дані надає Open-Meteo", color = mutedWhite, fontSize = 12.sp)
     }
 }
