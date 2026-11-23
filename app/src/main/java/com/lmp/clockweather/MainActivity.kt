@@ -454,7 +454,7 @@ fun LmpWeatherApp() {
 
 private fun Modifier.oceanGlass(
     radius: androidx.compose.ui.unit.Dp = 26.dp,
-    fillAlpha: Float = 0.23f
+    fillAlpha: Float = 0.20f
 ): Modifier {
     val shape = RoundedCornerShape(radius)
     return this
@@ -462,20 +462,20 @@ private fun Modifier.oceanGlass(
         .background(
             Brush.verticalGradient(
                 colorStops = arrayOf(
-                    0.0f to Color(0xFFE8FFFC).copy(alpha = fillAlpha + 0.13f),
-                    0.18f to Color(0xFFB9FFF6).copy(alpha = fillAlpha + 0.055f),
-                    0.58f to Color(0xFF63D9D1).copy(alpha = fillAlpha * 0.72f),
-                    1.0f to Color(0xFF073D52).copy(alpha = fillAlpha * 0.64f)
+                    0.0f to Color(0xFFE9FFFC).copy(alpha = fillAlpha + 0.10f),
+                    0.16f to Color(0xFFB9FFF6).copy(alpha = fillAlpha + 0.035f),
+                    0.48f to Color(0xFF63D9D1).copy(alpha = fillAlpha * 0.58f),
+                    1.0f to Color(0xFF073D52).copy(alpha = fillAlpha * 0.52f)
                 )
             )
         )
         .border(
-            width = 1.5.dp,
+            width = 1.25.dp,
             brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.62f),
-                    Color(0xFFB9FFF6).copy(alpha = 0.34f),
-                    Color.White.copy(alpha = 0.19f)
+                colorStops = arrayOf(
+                    0.0f to Color(0xFFE9FFFC).copy(alpha = 0.70f),
+                    0.38f to Color(0xFF8EF4E8).copy(alpha = 0.42f),
+                    1.0f to Color(0xFF6BDDD4).copy(alpha = 0.25f)
                 )
             ),
             shape = shape
@@ -1278,7 +1278,7 @@ fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
 @Composable
 fun WeatherMetric(title: String, value: String, iconRes: Int, modifier: Modifier = Modifier) {
     Column(
-        modifier.oceanGlass(24.dp, 0.25f).padding(horizontal = 18.dp, vertical = 17.dp)
+        modifier.oceanGlass(24.dp, 0.20f).padding(horizontal = 18.dp, vertical = 17.dp)
     ) {
         Image(painter = painterResource(iconRes), contentDescription = title, modifier = Modifier.size(31.dp))
         Spacer(Modifier.height(10.dp))
@@ -1298,7 +1298,7 @@ private fun PressureCard(pressureHpa: Double, modifier: Modifier = Modifier) {
         else -> "Нормальний"
     }
     Column(
-        modifier = modifier.oceanGlass(24.dp, 0.25f).height(148.dp).padding(17.dp)
+        modifier = modifier.oceanGlass(24.dp, 0.20f).height(148.dp).padding(17.dp)
     ) {
         Text("АТМОСФЕРНИЙ ТИСК", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
         Spacer(Modifier.height(8.dp))
@@ -1313,7 +1313,7 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
     val normalized = ((direction % 360) + 360) % 360
     val compass = directions[((normalized + 22) / 45) % 8]
     Column(
-        modifier = modifier.oceanGlass(24.dp, 0.25f).height(148.dp).padding(14.dp),
+        modifier = modifier.oceanGlass(24.dp, 0.20f).height(148.dp).padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("НАПРЯМОК ВІТРУ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
