@@ -525,7 +525,27 @@ fun MainWeatherScreen(
             Spacer(Modifier.height(20.dp))
             if (weather != null) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Image(painter = painterResource(weatherIconRes(weather.now.code)), contentDescription = weatherDescription(weather.now.code), modifier = Modifier.size(82.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(104.dp)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFBDFBF3).copy(alpha = 0.22f),
+                                        Color(0xFF79DCD7).copy(alpha = 0.10f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(weatherIconRes(weather.now.code)),
+                            contentDescription = weatherDescription(weather.now.code),
+                            modifier = Modifier.size(82.dp)
+                        )
+                    }
                     Spacer(Modifier.width(16.dp))
                     Column {
                         Text("${formatTemp(weather.now.temperature, useCelsius)}°", color = cream, fontSize = 76.sp, fontWeight = FontWeight.Thin, lineHeight = 80.sp)
@@ -593,7 +613,7 @@ fun MainWeatherScreen(
                         ) {
                             Text(hour.time, color = mutedWhite, fontSize = 13.sp)
                             Spacer(Modifier.height(8.dp))
-                            Image(painter = painterResource(weatherIconRes(hour.code)), contentDescription = weatherDescription(hour.code), modifier = Modifier.size(30.dp))
+                            Image(painter = painterResource(weatherIconRes(hour.code)), contentDescription = weatherDescription(hour.code), modifier = Modifier.size(32.dp))
                             Spacer(Modifier.height(8.dp))
                             Text("${formatTemp(hour.temperature, useCelsius)}°", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
                             Spacer(Modifier.height(5.dp))
@@ -627,7 +647,7 @@ fun MainWeatherScreen(
                 weather.days.forEach { day ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(day.day, color = cream, modifier = Modifier.weight(1f), fontSize = 16.sp)
-                        Image(painter = painterResource(weatherIconRes(day.code)), contentDescription = weatherDescription(day.code), modifier = Modifier.size(34.dp))
+                        Image(painter = painterResource(weatherIconRes(day.code)), contentDescription = weatherDescription(day.code), modifier = Modifier.size(32.dp))
                         Text("${formatTemp(day.low, useCelsius)}°", color = mutedWhite, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
                         Text("${formatTemp(day.high, useCelsius)}°", color = cream, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
                     }
