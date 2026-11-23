@@ -19,6 +19,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -509,8 +515,26 @@ fun MainWeatherScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
+            val refreshTransition = rememberInfiniteTransition(label = "refresh_rotation")
+            val refreshRotation = refreshTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 950, easing = LinearEasing)
+                ),
+                label = "refresh_rotation_value"
+            )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "Оновити", tint = cream) }
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Оновити",
+                        tint = cream,
+                        modifier = Modifier.graphicsLayer {
+                            rotationZ = if (loading) refreshRotation.value else 0f
+                        }
+                    )
+                }
                 IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Налаштування", tint = cream) }
             }
             Spacer(Modifier.height(6.dp))
