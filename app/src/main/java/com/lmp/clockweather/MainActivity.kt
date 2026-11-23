@@ -39,7 +39,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -452,7 +451,7 @@ fun LmpWeatherApp() {
 
 private fun Modifier.oceanGlass(
     radius: androidx.compose.ui.unit.Dp = 26.dp,
-    fillAlpha: Float = 0.22f
+    fillAlpha: Float = 0.23f
 ): Modifier {
     val shape = RoundedCornerShape(radius)
     return this
@@ -460,20 +459,20 @@ private fun Modifier.oceanGlass(
         .background(
             Brush.verticalGradient(
                 colorStops = arrayOf(
-                    0.0f to Color(0xFFF0FFFD).copy(alpha = fillAlpha + 0.10f),
-                    0.16f to Color(0xFFB8FFF6).copy(alpha = fillAlpha + 0.035f),
-                    0.54f to Color(0xFF39C9C2).copy(alpha = fillAlpha * 0.68f),
-                    1.0f to Color(0xFF063B50).copy(alpha = fillAlpha * 0.66f)
+                    0.0f to Color(0xFFE8FFFC).copy(alpha = fillAlpha + 0.13f),
+                    0.18f to Color(0xFFB9FFF6).copy(alpha = fillAlpha + 0.055f),
+                    0.58f to Color(0xFF63D9D1).copy(alpha = fillAlpha * 0.72f),
+                    1.0f to Color(0xFF073D52).copy(alpha = fillAlpha * 0.64f)
                 )
             )
         )
         .border(
-            width = 1.35.dp,
+            width = 1.5.dp,
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.68f),
-                    Color(0xFFB9FFF6).copy(alpha = 0.32f),
-                    Color.White.copy(alpha = 0.16f)
+                    Color.White.copy(alpha = 0.62f),
+                    Color(0xFFB9FFF6).copy(alpha = 0.34f),
+                    Color.White.copy(alpha = 0.19f)
                 )
             ),
             shape = shape
@@ -488,42 +487,14 @@ fun MainWeatherScreen(
     var clockNow by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) { while (true) { clockNow = Date(); delay(1000) } }
     val background = Brush.verticalGradient(
-        colorStops = arrayOf(
-            0.0f to Color(0xFF032B40),
-            0.20f to Color(0xFF04596B),
-            0.43f to Color(0xFF087F86),
-            0.64f to Color(0xFF079C91),
-            0.82f to Color(0xFF08736F),
-            1.0f to Color(0xFF042C43)
+        colors = listOf(
+            Color(0xFF063B4A),
+            Color(0xFF087F83),
+            Color(0xFF079B91)
         )
     )
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(background)
-            .drawBehind {
-                val w = size.width
-                val h = size.height
-                val farRidge = Path().apply {
-                    moveTo(0f, h * 0.34f)
-                    cubicTo(w * 0.20f, h * 0.31f, w * 0.28f, h * 0.25f, w * 0.48f, h * 0.27f)
-                    cubicTo(w * 0.70f, h * 0.29f, w * 0.78f, h * 0.22f, w, h * 0.24f)
-                    lineTo(w, h * 0.48f)
-                    lineTo(0f, h * 0.48f)
-                    close()
-                }
-                drawPath(farRidge, Color(0xFF063D59).copy(alpha = 0.20f))
-                val nearRidge = Path().apply {
-                    moveTo(0f, h * 0.39f)
-                    cubicTo(w * 0.18f, h * 0.35f, w * 0.32f, h * 0.39f, w * 0.52f, h * 0.34f)
-                    cubicTo(w * 0.74f, h * 0.29f, w * 0.86f, h * 0.35f, w, h * 0.30f)
-                    lineTo(w, h * 0.52f)
-                    lineTo(0f, h * 0.52f)
-                    close()
-                }
-                drawPath(nearRidge, Color(0xFF052F4A).copy(alpha = 0.16f))
-            }
-            .navigationBarsPadding(),
+        modifier = Modifier.fillMaxSize().background(background).navigationBarsPadding(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -544,7 +515,7 @@ fun MainWeatherScreen(
             Spacer(Modifier.height(20.dp))
             if (weather != null) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Image(painter = painterResource(weatherIconRes(weather.now.code)), contentDescription = weatherDescription(weather.now.code), modifier = Modifier.size(90.dp))
+                    Image(painter = painterResource(weatherIconRes(weather.now.code)), contentDescription = weatherDescription(weather.now.code), modifier = Modifier.size(82.dp))
                     Spacer(Modifier.width(16.dp))
                     Column {
                         Text("${formatTemp(weather.now.temperature, useCelsius)}°", color = cream, fontSize = 76.sp, fontWeight = FontWeight.Thin, lineHeight = 80.sp)
@@ -1317,37 +1288,12 @@ private fun PressureCard(pressureHpa: Double, modifier: Modifier = Modifier) {
         else -> "Нормальний"
     }
     Column(
-        modifier = modifier.oceanGlass(24.dp, 0.24f).height(148.dp).padding(15.dp),
-        verticalArrangement = Arrangement.Center
+        modifier = modifier.oceanGlass(24.dp, 0.25f).height(148.dp).padding(17.dp)
     ) {
-        Canvas(Modifier.size(34.dp)) {
-            val center = Offset(size.width / 2f, size.height / 2f)
-            drawArc(
-                color = Color.White.copy(alpha = 0.34f),
-                startAngle = 135f,
-                sweepAngle = 270f,
-                useCenter = false,
-                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = Color(0xFF66D9F2),
-                startAngle = 135f,
-                sweepAngle = 190f,
-                useCenter = false,
-                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-            )
-            drawLine(
-                color = Color(0xFFFFC978),
-                start = center,
-                end = Offset(center.x + 10.dp.toPx(), center.y - 9.dp.toPx()),
-                strokeWidth = 2.5.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-            drawCircle(cream, radius = 2.5.dp.toPx(), center = center)
-        }
-        Spacer(Modifier.height(5.dp))
-        Text("${pressureMmhg.toInt()} мм", color = cream, fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
-        Text("Атмосферний тиск · $label", color = mutedWhite, fontSize = 11.sp)
+        Text("АТМОСФЕРНИЙ ТИСК", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        Text("${pressureMmhg.toInt()} мм", color = cream, fontSize = 23.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = mutedWhite, fontSize = 12.sp)
     }
 }
 
@@ -1356,33 +1302,25 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
     val directions = listOf("Пн", "Пн-Сх", "Сх", "Пд-Сх", "Пд", "Пд-Зх", "Зх", "Пн-Зх")
     val normalized = ((direction % 360) + 360) % 360
     val compass = directions[((normalized + 22) / 45) % 8]
-    Row(
-        modifier = modifier.oceanGlass(24.dp, 0.24f).height(148.dp).padding(13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+    Column(
+        modifier = modifier.oceanGlass(24.dp, 0.25f).height(148.dp).padding(14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Canvas(Modifier.size(48.dp)) {
+        Text("НАПРЯМОК ВІТРУ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(3.dp))
+        Canvas(Modifier.size(38.dp)) {
             val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = size.minDimension * 0.43f
-            drawCircle(
-                color = Color.White.copy(alpha = 0.38f),
-                radius = radius,
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
-            )
+            val radius = size.minDimension * 0.40f
+            drawCircle(color = Color.White.copy(alpha = 0.28f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
             val radians = Math.toRadians(direction.toDouble())
             val dx = kotlin.math.sin(radians).toFloat()
             val dy = -kotlin.math.cos(radians).toFloat()
             val tip = Offset(center.x + dx * radius * 0.82f, center.y + dy * radius * 0.82f)
-            drawLine(Color(0xFFFFC978), center, tip, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
-            drawCircle(cream, radius = 3.dp.toPx(), center = center)
+            drawLine(color = Color(0xFFFFC978), start = center, end = tip, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+            drawCircle(color = cream, radius = 3.dp.toPx(), center = center)
         }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text("НАПРЯМОК ВІТРУ", color = mutedWhite, fontSize = 9.sp, letterSpacing = 0.8.sp)
-            Text(compass, color = cream, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text("$normalized°", color = mutedWhite, fontSize = 11.sp)
-        }
+        Text(compass, color = cream, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+        Text("$normalized°", color = mutedWhite, fontSize = 11.sp)
     }
 }
 
