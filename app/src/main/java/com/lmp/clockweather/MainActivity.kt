@@ -29,6 +29,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -486,6 +487,9 @@ fun LmpWeatherApp() {
             },
             onBack = {
                 showSettings = false
+            },
+            onCities = {
+                showCities = true
             }
         )
 
@@ -511,8 +515,7 @@ fun LmpWeatherApp() {
             },
             onLocation = {
                 ensureBackgroundAndStart()
-            },
-            onCities = { showCities = true }
+            }
         )
     }
 
@@ -577,7 +580,7 @@ private fun Modifier.oceanGlass(
 fun MainWeatherScreen(
     weather: WeatherBundle?, loading: Boolean, error: String, locationName: String,
     useCelsius: Boolean, onRefresh: () -> Unit, onSettings: () -> Unit,
-    onLocation: () -> Unit, onCities: () -> Unit
+    onLocation: () -> Unit
 ) {
     var clockNow by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) { while (true) { clockNow = Date(); delay(1000) } }
@@ -631,10 +634,6 @@ fun MainWeatherScreen(
                 Icon(Icons.Default.LocationOn, null, tint = cream, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(locationName, color = cream, fontSize = 18.sp)
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = onCities, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) {
-                    Text("Мої міста", color = Color(0xFFBFFFF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
             }
             Spacer(Modifier.height(20.dp))
             if (weather != null) {
@@ -1481,7 +1480,12 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(
+    useCelsius: Boolean,
+    onCelsiusChange: (Boolean) -> Unit,
+    onBack: () -> Unit,
+    onCities: () -> Unit
+) {
     Column(
         Modifier.fillMaxSize()
             .background(
@@ -1503,6 +1507,19 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Цельсій (°C)", color = cream, modifier = Modifier.weight(1f))
             Switch(checked = useCelsius, onCheckedChange = onCelsiusChange)
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("МІСЦЯ", color = mutedWhite, fontSize = 13.sp, letterSpacing = 1.5.sp)
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = onCities,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = cream),
+            border = BorderStroke(1.dp, Color(0xFFBFFFFF).copy(alpha = 0.55f))
+        ) {
+            Icon(Icons.Default.LocationOn, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Мої міста")
         }
         Spacer(Modifier.height(20.dp))
         Text("Версія 1.12", color = mutedWhite)
