@@ -502,115 +502,151 @@ fun MainWeatherScreen(
                 val w = size.width
                 val h = size.height
 
-                // Distant peaks: soft, desaturated blue-teal silhouettes.
-                val distantPeaks = Path().apply {
-                    moveTo(0f, h * 0.315f)
-                    lineTo(w * 0.10f, h * 0.285f)
-                    lineTo(w * 0.22f, h * 0.245f)
-                    lineTo(w * 0.34f, h * 0.275f)
-                    lineTo(w * 0.48f, h * 0.225f)
-                    lineTo(w * 0.61f, h * 0.265f)
-                    lineTo(w * 0.76f, h * 0.205f)
-                    lineTo(w * 0.90f, h * 0.245f)
-                    lineTo(w, h * 0.22f)
-                    lineTo(w, h * 0.53f)
-                    lineTo(0f, h * 0.53f)
-                    close()
-                }
-                drawPath(
-                    distantPeaks,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF65D8D2).copy(alpha = 0.16f),
-                            Color(0xFF167E8A).copy(alpha = 0.24f),
-                            Color(0xFF075365).copy(alpha = 0.10f)
-                        ),
-                        startY = h * 0.20f,
-                        endY = h * 0.54f
-                    )
-                )
-
-                // Mid-range ridge with overlapping valleys for depth.
-                val middleRidge = Path().apply {
-                    moveTo(0f, h * 0.365f)
-                    cubicTo(w * 0.12f, h * 0.345f, w * 0.18f, h * 0.295f, w * 0.31f, h * 0.325f)
-                    cubicTo(w * 0.43f, h * 0.355f, w * 0.52f, h * 0.30f, w * 0.64f, h * 0.325f)
-                    cubicTo(w * 0.79f, h * 0.355f, w * 0.87f, h * 0.285f, w, h * 0.305f)
-                    lineTo(w, h * 0.61f)
-                    lineTo(0f, h * 0.61f)
-                    close()
-                }
-                drawPath(
-                    middleRidge,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF0A7180).copy(alpha = 0.28f),
-                            Color(0xFF075568).copy(alpha = 0.36f),
-                            Color(0xFF06485B).copy(alpha = 0.12f)
-                        ),
-                        startY = h * 0.29f,
-                        endY = h * 0.62f
-                    )
-                )
-
-                // Foreground mountain shoulders.
-                val foregroundRidge = Path().apply {
-                    moveTo(0f, h * 0.425f)
-                    cubicTo(w * 0.13f, h * 0.395f, w * 0.22f, h * 0.355f, w * 0.36f, h * 0.385f)
-                    cubicTo(w * 0.50f, h * 0.415f, w * 0.62f, h * 0.36f, w * 0.75f, h * 0.385f)
-                    cubicTo(w * 0.86f, h * 0.405f, w * 0.93f, h * 0.37f, w, h * 0.36f)
-                    lineTo(w, h * 0.68f)
-                    lineTo(0f, h * 0.68f)
-                    close()
-                }
-                drawPath(
-                    foregroundRidge,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF064B60).copy(alpha = 0.44f),
-                            Color(0xFF075C68).copy(alpha = 0.31f),
-                            Color(0xFF087D79).copy(alpha = 0.05f)
-                        ),
-                        startY = h * 0.36f,
-                        endY = h * 0.69f
-                    )
-                )
-
-                // A soft mist valley, painted as a curved translucent ribbon.
-                val mist = Path().apply {
-                    moveTo(0f, h * 0.455f)
-                    cubicTo(w * 0.18f, h * 0.425f, w * 0.27f, h * 0.465f, w * 0.43f, h * 0.445f)
-                    cubicTo(w * 0.61f, h * 0.42f, w * 0.78f, h * 0.47f, w, h * 0.425f)
-                    lineTo(w, h * 0.465f)
-                    cubicTo(w * 0.78f, h * 0.50f, w * 0.60f, h * 0.455f, w * 0.43f, h * 0.485f)
-                    cubicTo(w * 0.25f, h * 0.51f, w * 0.14f, h * 0.47f, 0f, h * 0.495f)
-                    close()
-                }
-                drawPath(
-                    mist,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFB8F7EF).copy(alpha = 0.12f),
-                            Color(0xFF9CECE5).copy(alpha = 0.035f),
+                // Atmospheric glow behind the distant mountain range.
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF75E9DF).copy(alpha = 0.20f),
+                            Color(0xFF2AAFB0).copy(alpha = 0.08f),
                             Color.Transparent
                         ),
-                        startY = h * 0.42f,
-                        endY = h * 0.51f
+                        center = Offset(w * 0.55f, h * 0.285f),
+                        radius = w * 0.78f
+                    ),
+                    size = size
+                )
+
+                // Far mountains: broad, curved silhouettes with low contrast.
+                val farMountains = Path().apply {
+                    moveTo(0f, h * 0.335f)
+                    cubicTo(w * 0.10f, h * 0.315f, w * 0.13f, h * 0.255f, w * 0.25f, h * 0.265f)
+                    cubicTo(w * 0.36f, h * 0.275f, w * 0.39f, h * 0.315f, w * 0.50f, h * 0.285f)
+                    cubicTo(w * 0.62f, h * 0.245f, w * 0.67f, h * 0.205f, w * 0.78f, h * 0.225f)
+                    cubicTo(w * 0.88f, h * 0.245f, w * 0.92f, h * 0.285f, w, h * 0.265f)
+                    lineTo(w, h * 0.57f)
+                    cubicTo(w * 0.72f, h * 0.53f, w * 0.30f, h * 0.57f, 0f, h * 0.55f)
+                    close()
+                }
+                drawPath(
+                    farMountains,
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color(0xFF68D8D5).copy(alpha = 0.15f),
+                            0.30f to Color(0xFF238F9B).copy(alpha = 0.19f),
+                            0.72f to Color(0xFF0B6577).copy(alpha = 0.10f),
+                            1.0f to Color.Transparent
+                        ),
+                        startY = h * 0.20f,
+                        endY = h * 0.59f
                     )
                 )
 
-                // Dark pine-covered foreground edges, kept subtle behind the cards.
-                val forestColor = Color(0xFF063E50).copy(alpha = 0.40f)
+                // Mid mountains: overlapping rounded ridges, softly fading into mist.
+                val midMountains = Path().apply {
+                    moveTo(0f, h * 0.395f)
+                    cubicTo(w * 0.12f, h * 0.365f, w * 0.16f, h * 0.315f, w * 0.29f, h * 0.33f)
+                    cubicTo(w * 0.42f, h * 0.345f, w * 0.48f, h * 0.405f, w * 0.61f, h * 0.365f)
+                    cubicTo(w * 0.74f, h * 0.325f, w * 0.81f, h * 0.285f, w * 0.91f, h * 0.31f)
+                    cubicTo(w * 0.96f, h * 0.325f, w * 0.98f, h * 0.34f, w, h * 0.335f)
+                    lineTo(w, h * 0.64f)
+                    cubicTo(w * 0.72f, h * 0.60f, w * 0.30f, h * 0.66f, 0f, h * 0.62f)
+                    close()
+                }
+                drawPath(
+                    midMountains,
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color(0xFF08758A).copy(alpha = 0.22f),
+                            0.38f to Color(0xFF086477).copy(alpha = 0.25f),
+                            0.78f to Color(0xFF087B80).copy(alpha = 0.10f),
+                            1.0f to Color.Transparent
+                        ),
+                        startY = h * 0.29f,
+                        endY = h * 0.68f
+                    )
+                )
+
+                // Near ridge: deep teal, but its lower edge dissolves into the app background.
+                val nearMountains = Path().apply {
+                    moveTo(0f, h * 0.465f)
+                    cubicTo(w * 0.12f, h * 0.435f, w * 0.20f, h * 0.385f, w * 0.34f, h * 0.405f)
+                    cubicTo(w * 0.48f, h * 0.425f, w * 0.54f, h * 0.475f, w * 0.68f, h * 0.445f)
+                    cubicTo(w * 0.82f, h * 0.415f, w * 0.90f, h * 0.375f, w, h * 0.39f)
+                    lineTo(w, h * 0.72f)
+                    cubicTo(w * 0.70f, h * 0.69f, w * 0.28f, h * 0.73f, 0f, h * 0.70f)
+                    close()
+                }
+                drawPath(
+                    nearMountains,
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color(0xFF064B60).copy(alpha = 0.36f),
+                            0.32f to Color(0xFF075D6B).copy(alpha = 0.27f),
+                            0.70f to Color(0xFF087D79).copy(alpha = 0.10f),
+                            1.0f to Color.Transparent
+                        ),
+                        startY = h * 0.37f,
+                        endY = h * 0.74f
+                    )
+                )
+
+                // Layered mist ribbons soften every mountain edge and merge it into the teal backdrop.
+                val mistOne = Path().apply {
+                    moveTo(0f, h * 0.475f)
+                    cubicTo(w * 0.17f, h * 0.435f, w * 0.29f, h * 0.49f, w * 0.45f, h * 0.46f)
+                    cubicTo(w * 0.63f, h * 0.425f, w * 0.82f, h * 0.48f, w, h * 0.44f)
+                    lineTo(w, h * 0.50f)
+                    cubicTo(w * 0.78f, h * 0.535f, w * 0.59f, h * 0.48f, w * 0.43f, h * 0.515f)
+                    cubicTo(w * 0.25f, h * 0.545f, w * 0.12f, h * 0.49f, 0f, h * 0.53f)
+                    close()
+                }
+                drawPath(
+                    mistOne,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFFBDF7F0).copy(alpha = 0.13f),
+                            Color(0xFF9DEBE5).copy(alpha = 0.055f),
+                            Color.Transparent
+                        ),
+                        startY = h * 0.43f,
+                        endY = h * 0.55f
+                    )
+                )
+
+                val mistTwo = Path().apply {
+                    moveTo(0f, h * 0.565f)
+                    cubicTo(w * 0.20f, h * 0.535f, w * 0.31f, h * 0.585f, w * 0.49f, h * 0.555f)
+                    cubicTo(w * 0.68f, h * 0.525f, w * 0.84f, h * 0.575f, w, h * 0.54f)
+                    lineTo(w, h * 0.61f)
+                    cubicTo(w * 0.78f, h * 0.645f, w * 0.60f, h * 0.59f, w * 0.43f, h * 0.625f)
+                    cubicTo(w * 0.24f, h * 0.655f, w * 0.12f, h * 0.60f, 0f, h * 0.635f)
+                    close()
+                }
+                drawPath(
+                    mistTwo,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFFB4F1E9).copy(alpha = 0.08f),
+                            Color(0xFF8ADFD9).copy(alpha = 0.035f),
+                            Color.Transparent
+                        ),
+                        startY = h * 0.53f,
+                        endY = h * 0.66f
+                    )
+                )
+
+                // Pine silhouettes only at the far edges, fading into the mist.
+                val forestColor = Color(0xFF063D50).copy(alpha = 0.30f)
                 val treePositions = listOf(
-                    0.015f to 0.565f, 0.055f to 0.585f, 0.095f to 0.575f,
-                    0.145f to 0.605f, 0.195f to 0.59f, 0.83f to 0.59f,
-                    0.88f to 0.575f, 0.925f to 0.60f, 0.97f to 0.565f
+                    0.012f to 0.625f, 0.050f to 0.645f, 0.090f to 0.635f,
+                    0.135f to 0.66f, 0.18f to 0.645f, 0.84f to 0.65f,
+                    0.885f to 0.63f, 0.93f to 0.655f, 0.975f to 0.625f
                 )
                 treePositions.forEachIndexed { index, pair ->
                     val x = w * pair.first
                     val baseY = h * pair.second
-                    val treeHeight = h * (0.035f + (index % 3) * 0.008f)
-                    val halfWidth = w * 0.018f
+                    val treeHeight = h * (0.028f + (index % 3) * 0.007f)
+                    val halfWidth = w * 0.016f
                     val tree = Path().apply {
                         moveTo(x, baseY - treeHeight)
                         lineTo(x - halfWidth, baseY)
@@ -624,8 +660,7 @@ fun MainWeatherScreen(
                     }
                     drawPath(tree, forestColor)
                 }
-            }
-            .navigationBarsPadding(),
+            }            .navigationBarsPadding(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
