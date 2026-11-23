@@ -82,7 +82,8 @@ data class WeatherNow(
     val low: Int,
     val pressureHpa: Double,
     val windDirection: Int,
-    val city: String = "Київ"
+    val city: String = "Київ",
+    val visibilityMeters: Double = 10000.0
 )
 
 data class DayForecast(val day: String, val code: Int, val high: Int, val low: Int)
@@ -497,6 +498,12 @@ fun MainWeatherScreen(
                     PressureCard(weather.now.pressureHpa, Modifier.weight(1f))
                     WindDirectionCard(weather.now.windDirection, Modifier.weight(1f))
                 }
+                Spacer(Modifier.height(14.dp))
+                VisibilityCard(
+                    visibilityMeters = weather.now.visibilityMeters,
+                    weatherCode = weather.now.code,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(18.dp))
                 weather.airQuality?.let { air ->
                     AirQualityCard(air, Modifier.fillMaxWidth())
@@ -1043,6 +1050,53 @@ fun TemperatureTrendCard(
 }
 
 @Composable
+fun VisibilityCard(
+    visibilityMeters: Double,
+    weatherCode: Int,
+    modifier: Modifier = Modifier
+) {
+    val visibilityKm = (visibilityMeters / 1000.0).coerceAtLeast(0.0)
+    val (status, detail) = when {
+        visibilityKm < 1.0 -> "Дуже погана" to "Видимість менше 1 км. Будь уважним на дорогах."
+        visibilityKm < 4.0 -> "Погана" to "Обмежена видимість. Рухайся обережно."
+        visibilityKm < 10.0 -> "Помірна" to "Дальність огляду дещо обмежена."
+        else -> "Добра" to "Гарна дальність огляду."
+    }
+    val fog = weatherCode == 45 || weatherCode == 48
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("◉", color = cream, fontSize = 22.sp)
+            Spacer(Modifier.width(9.dp))
+            Text("ВИДИМІСТЬ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.4.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                String.format(Locale.US, "%.1f", visibilityKm),
+                color = cream,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Light
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("км", color = mutedWhite, fontSize = 15.sp, modifier = Modifier.padding(bottom = 5.dp))
+            Spacer(Modifier.weight(1f))
+            Text(status, color = cream, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(detail, color = mutedWhite, fontSize = 12.sp)
+        if (fog) {
+            Spacer(Modifier.height(8.dp))
+            Text("Метеоумови відповідають туману або паморозному туману.", color = cream, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
 fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
     val aqi = air.europeanAqi.coerceAtLeast(0)
     val (label, advice, levelColor) = when {
@@ -1294,7 +1348,7 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
 }
 
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
-    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7"
+    val endpoint = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,uv_index,visibility&hourly=temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,wind_speed_10m,cloud_cover,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,rain_sum,snowfall_sum,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=7"
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
@@ -1375,7 +1429,8 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
             WeatherNow(current.getDouble("temperature_2m").toInt(), current.getDouble("apparent_temperature").toInt(),
                 current.getInt("relative_humidity_2m"), current.getDouble("wind_speed_10m").toInt(),
                 current.getInt("weather_code"), highs.getDouble(0).toInt(), lows.getDouble(0).toInt(),
-                current.optDouble("surface_pressure", 1013.25), current.optInt("wind_direction_10m", 0), city),
+                current.optDouble("surface_pressure", 1013.25), current.optInt("wind_direction_10m", 0), city,
+                current.optDouble("visibility", 10000.0)),
             days,
             hours,
             hours48,
