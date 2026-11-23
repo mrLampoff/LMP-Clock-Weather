@@ -39,7 +39,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -456,12 +455,6 @@ private fun Modifier.oceanGlass(
 ): Modifier {
     val shape = RoundedCornerShape(radius)
     return this
-        .shadow(
-            elevation = 18.dp,
-            shape = shape,
-            ambientColor = Color(0xFF001824).copy(alpha = 0.34f),
-            spotColor = Color(0xFF001824).copy(alpha = 0.42f)
-        )
         .clip(shape)
         .background(
             Brush.verticalGradient(
