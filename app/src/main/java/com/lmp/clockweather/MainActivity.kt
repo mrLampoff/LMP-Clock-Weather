@@ -34,6 +34,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -144,6 +145,60 @@ data class WeatherBundle(
     val dailySnowfallCm: Double = 0.0
 )
 
+data class CityOption(val name: String, val country: String, val latitude: Double, val longitude: Double) {
+    val label: String get() = if (country.isBlank()) name else "$name, $country"
+}
+
+private fun savedCities(context: Context): List<CityOption> {
+    val raw = context.getSharedPreferences("lmp_cities", Context.MODE_PRIVATE)
+        .getString("cities", "[]") ?: "[]"
+    return try {
+        val array = org.json.JSONArray(raw)
+        (0 until array.length()).map { i ->
+            val item = array.getJSONObject(i)
+            CityOption(
+                item.getString("name"), item.optString("country"),
+                item.getDouble("latitude"), item.getDouble("longitude")
+            )
+        }
+    } catch (_: Exception) { emptyList() }
+}
+
+private fun storeCities(context: Context, cities: List<CityOption>) {
+    val array = org.json.JSONArray()
+    cities.forEach { city ->
+        array.put(JSONObject().apply {
+            put("name", city.name); put("country", city.country)
+            put("latitude", city.latitude); put("longitude", city.longitude)
+        })
+    }
+    context.getSharedPreferences("lmp_cities", Context.MODE_PRIVATE)
+        .edit().putString("cities", array.toString()).apply()
+}
+
+private fun searchCityOptions(query: String): List<CityOption> {
+    val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+    val endpoint = "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=10&language=uk&format=json"
+    val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"; connectTimeout = 10000; readTimeout = 10000
+    }
+    try {
+        val body = connection.inputStream.bufferedReader().use { it.readText() }
+        val results = JSONObject(body).optJSONArray("results") ?: return emptyList()
+        return (0 until results.length()).map { i ->
+            val item = results.getJSONObject(i)
+            CityOption(
+                item.optString("name"),
+                item.optString("country"),
+                item.getDouble("latitude"),
+                item.getDouble("longitude")
+            )
+        }
+    } finally {
+        connection.disconnect()
+    }
+}
+
 @Composable
 fun LmpWeatherApp() {
     val context = LocalContext.current
@@ -176,6 +231,9 @@ fun LmpWeatherApp() {
     var locationName by remember {
         mutableStateOf("Київ")
     }
+
+    var showCities by remember { mutableStateOf(false) }
+    var cityList by remember { mutableStateOf(savedCities(context)) }
 
     // Завантаження погоди
     fun load(
@@ -453,7 +511,34 @@ fun LmpWeatherApp() {
             },
             onLocation = {
                 ensureBackgroundAndStart()
-            }
+            },
+            onCities = { showCities = true }
+        )
+    }
+
+    if (showCities) {
+        CitiesDialog(
+            cities = cityList,
+            onSearch = { query ->
+                withContext(Dispatchers.IO) { searchCityOptions(query) }
+            },
+            onSave = { city ->
+                cityList = (cityList.filterNot {
+                    it.latitude == city.latitude && it.longitude == city.longitude
+                } + city).takeLast(20)
+                storeCities(context, cityList)
+            },
+            onSelect = { city ->
+                load(city.latitude, city.longitude, city.name)
+                showCities = false
+            },
+            onDelete = { city ->
+                cityList = cityList.filterNot {
+                    it.latitude == city.latitude && it.longitude == city.longitude
+                }
+                storeCities(context, cityList)
+            },
+            onDismiss = { showCities = false }
         )
     }
 }
@@ -491,7 +576,8 @@ private fun Modifier.oceanGlass(
 @Composable
 fun MainWeatherScreen(
     weather: WeatherBundle?, loading: Boolean, error: String, locationName: String,
-    useCelsius: Boolean, onRefresh: () -> Unit, onSettings: () -> Unit, onLocation: () -> Unit
+    useCelsius: Boolean, onRefresh: () -> Unit, onSettings: () -> Unit,
+    onLocation: () -> Unit, onCities: () -> Unit
 ) {
     var clockNow by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) { while (true) { clockNow = Date(); delay(1000) } }
@@ -541,10 +627,14 @@ fun MainWeatherScreen(
             Text(SimpleDateFormat("HH:mm", Locale("uk", "UA")).format(clockNow), color = cream, fontSize = 84.sp, fontWeight = FontWeight.Thin, letterSpacing = (-3.5).sp, textAlign = TextAlign.Center, lineHeight = 90.sp)
             Text(SimpleDateFormat("EEEE, d MMMM", Locale("uk", "UA")).format(clockNow).replaceFirstChar { it.uppercase() }, color = mutedWhite, fontSize = 20.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                 Icon(Icons.Default.LocationOn, null, tint = cream, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(locationName, color = cream, fontSize = 18.sp)
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onCities, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) {
+                    Text("Мої міста", color = Color(0xFFBFFFF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
             Spacer(Modifier.height(20.dp))
             if (weather != null) {
@@ -1515,6 +1605,110 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(7.dp))
         Text(uvAdvice, color = cream, fontSize = 12.sp)
     }
+}
+
+@Composable
+private fun CitiesDialog(
+    cities: List<CityOption>,
+    onSearch: suspend (String) -> List<CityOption>,
+    onSave: (CityOption) -> Unit,
+    onSelect: (CityOption) -> Unit,
+    onDelete: (CityOption) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<CityOption>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Мої міста", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Знайти місто") },
+                    placeholder = { Text("Наприклад, Львів") }
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        enabled = query.trim().length >= 2 && !searching,
+                        onClick = {
+                            scope.launch {
+                                searching = true
+                                message = ""
+                                try {
+                                    results = onSearch(query.trim())
+                                    if (results.isEmpty()) message = "Нічого не знайдено"
+                                } catch (_: Exception) {
+                                    message = "Помилка пошуку. Перевір інтернет."
+                                } finally { searching = false }
+                            }
+                        }
+                    ) { Text(if (searching) "Шукаю…" else "Шукати") }
+                    if (message.isNotBlank()) {
+                        Text(message, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (results.isNotEmpty()) {
+                    Text("Результати пошуку", fontWeight = FontWeight.SemiBold)
+                    LazyColumn(Modifier.heightIn(max = 150.dp)) {
+                        items(results.size) { index ->
+                            val city = results[index]
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        onSave(city)
+                                        onSelect(city)
+                                    }
+                                ) {
+                                    Text(city.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
+                                }
+                                TextButton(onClick = { onSave(city) }) { Text("Зберегти") }
+                            }
+                        }
+                    }
+                    HorizontalDivider()
+                }
+                Spacer(Modifier.height(6.dp))
+                Text("Збережені міста", fontWeight = FontWeight.SemiBold)
+                if (cities.isEmpty()) {
+                    Text("Поки що немає збережених міст", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    LazyColumn(Modifier.heightIn(max = 190.dp)) {
+                        items(cities.size) { index ->
+                            val city = cities[index]
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onSelect(city) }
+                                ) {
+                                    Text(city.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
+                                }
+                                TextButton(onClick = { onDelete(city) }) { Text("Видалити") }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Готово") }
+        }
+    )
 }
 
 private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle {
