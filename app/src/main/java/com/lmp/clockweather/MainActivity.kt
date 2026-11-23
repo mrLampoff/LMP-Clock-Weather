@@ -66,8 +66,8 @@ private val mutedWhite = Color(0xD9FFFFFF)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(57, 45, 53)
-        window.navigationBarColor = android.graphics.Color.rgb(33, 31, 42)
+        window.statusBarColor = android.graphics.Color.rgb(6, 59, 70)
+        window.navigationBarColor = android.graphics.Color.rgb(18, 61, 80)
         setContent { LmpWeatherApp() }
     }
 }
@@ -456,7 +456,13 @@ fun MainWeatherScreen(
     var clockNow by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) { while (true) { clockNow = Date(); delay(1000) } }
     val background = Brush.verticalGradient(
-        listOf(Color(0xFF51404A), Color(0xFF9B665B), Color(0xFFE4A36E), Color(0xFF514B55), Color(0xFF252A35))
+        colors = listOf(
+            Color(0xFF063B46),
+            Color(0xFF087E83),
+            Color(0xFF159A91),
+            Color(0xFF176F78),
+            Color(0xFF123D50)
+        )
     )
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(background).navigationBarsPadding(),
@@ -1304,7 +1310,19 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
 
 @Composable
 fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF51404A), Color(0xFF252A35)))).padding(24.dp)) {
+    Column(
+        Modifier.fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF063B46),
+                        Color(0xFF087E83),
+                        Color(0xFF123D50)
+                    )
+                )
+            )
+            .padding(24.dp)
+    ) {
         TextButton(onClick = onBack) { Text("← Назад", color = cream) }
         Spacer(Modifier.height(24.dp))
         Text("Налаштування", color = cream, fontSize = 30.sp, fontWeight = FontWeight.Light)
