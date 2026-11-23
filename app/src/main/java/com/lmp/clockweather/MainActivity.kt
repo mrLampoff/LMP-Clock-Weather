@@ -39,6 +39,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -449,6 +450,42 @@ fun LmpWeatherApp() {
     }
 }
 
+private fun Modifier.oceanGlass(
+    radius: androidx.compose.ui.unit.Dp = 26.dp,
+    fillAlpha: Float = 0.23f
+): Modifier {
+    val shape = RoundedCornerShape(radius)
+    return this
+        .shadow(
+            elevation = 18.dp,
+            shape = shape,
+            ambientColor = Color(0xFF001824).copy(alpha = 0.34f),
+            spotColor = Color(0xFF001824).copy(alpha = 0.42f)
+        )
+        .clip(shape)
+        .background(
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to Color(0xFFE8FFFC).copy(alpha = fillAlpha + 0.13f),
+                    0.18f to Color(0xFFB9FFF6).copy(alpha = fillAlpha + 0.055f),
+                    0.58f to Color(0xFF63D9D1).copy(alpha = fillAlpha * 0.72f),
+                    1.0f to Color(0xFF073D52).copy(alpha = fillAlpha * 0.64f)
+                )
+            )
+        )
+        .border(
+            width = 1.5.dp,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.62f),
+                    Color(0xFFB9FFF6).copy(alpha = 0.34f),
+                    Color.White.copy(alpha = 0.19f)
+                )
+            ),
+            shape = shape
+        )
+}
+
 @Composable
 fun MainWeatherScreen(
     weather: WeatherBundle?, loading: Boolean, error: String, locationName: String,
@@ -458,16 +495,17 @@ fun MainWeatherScreen(
     LaunchedEffect(Unit) { while (true) { clockNow = Date(); delay(1000) } }
     val background = Brush.verticalGradient(
         colorStops = arrayOf(
-            0.0f to Color(0xFF073F49),
-            0.30f to Color(0xFF087F83),
-            0.58f to Color(0xFF13A49A),
-            0.82f to Color(0xFF087C7B),
-            1.0f to Color(0xFF103D52)
+            0.0f to Color(0xFF032B3B),
+            0.18f to Color(0xFF064A5A),
+            0.43f to Color(0xFF087D82),
+            0.63f to Color(0xFF08A69A),
+            0.82f to Color(0xFF08736F),
+            1.0f to Color(0xFF052C43)
         )
     )
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(background).navigationBarsPadding(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 14.dp, bottom = 34.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
@@ -475,35 +513,35 @@ fun MainWeatherScreen(
                 IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "Оновити", tint = cream) }
                 IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Налаштування", tint = cream) }
             }
-            Spacer(Modifier.height(16.dp))
-            Text(SimpleDateFormat("HH:mm", Locale("uk", "UA")).format(clockNow), color = cream, fontSize = 90.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = (-4).sp, textAlign = TextAlign.Center, lineHeight = 94.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(SimpleDateFormat("HH:mm", Locale("uk", "UA")).format(clockNow), color = cream, fontSize = 84.sp, fontWeight = FontWeight.Thin, letterSpacing = (-3.5).sp, textAlign = TextAlign.Center, lineHeight = 90.sp)
             Text(SimpleDateFormat("EEEE, d MMMM", Locale("uk", "UA")).format(clockNow).replaceFirstChar { it.uppercase() }, color = mutedWhite, fontSize = 20.sp, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.LocationOn, null, tint = cream, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(locationName, color = cream, fontSize = 18.sp)
             }
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(20.dp))
             if (weather != null) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Image(painter = painterResource(weatherIconRes(weather.now.code)), contentDescription = weatherDescription(weather.now.code), modifier = Modifier.size(84.dp))
+                    Image(painter = painterResource(weatherIconRes(weather.now.code)), contentDescription = weatherDescription(weather.now.code), modifier = Modifier.size(82.dp))
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text("${formatTemp(weather.now.temperature, useCelsius)}°", color = cream, fontSize = 82.sp, fontWeight = FontWeight.ExtraLight, lineHeight = 86.sp)
+                        Text("${formatTemp(weather.now.temperature, useCelsius)}°", color = cream, fontSize = 76.sp, fontWeight = FontWeight.Thin, lineHeight = 80.sp)
                         Text(weatherDescription(weather.now.code), color = mutedWhite, fontSize = 17.sp)
                     }
                 }
                 Text("Відчувається як ${formatTemp(weather.now.feelsLike, useCelsius)}°", color = mutedWhite, fontSize = 16.sp)
                 Spacer(Modifier.height(10.dp))
                 Text("Макс. ${formatTemp(weather.now.high, useCelsius)}°   ·   Мін. ${formatTemp(weather.now.low, useCelsius)}°", color = cream, fontSize = 18.sp)
-                Spacer(Modifier.height(28.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Spacer(Modifier.height(22.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     WeatherMetric("Вологість", "${weather.now.humidity}%", R.drawable.weather_humidity, Modifier.weight(1f))
                     WeatherMetric("Вітер", "${weather.now.wind} км/год", R.drawable.weather_wind, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     PressureCard(weather.now.pressureHpa, Modifier.weight(1f))
                     WindDirectionCard(weather.now.windDirection, Modifier.weight(1f))
                 }
@@ -550,16 +588,7 @@ fun MainWeatherScreen(
                     items(weather.hours.size) { index ->
                         val hour = weather.hours[index]
                         Column(
-                            modifier = Modifier.width(76.dp).clip(RoundedCornerShape(18.dp)).background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp)).padding(vertical = 12.dp, horizontal = 8.dp),
+                            modifier = Modifier.width(76.dp).oceanGlass(18.dp, 0.12f).padding(vertical = 12.dp, horizontal = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(hour.time, color = mutedWhite, fontSize = 13.sp)
@@ -690,18 +719,7 @@ fun BestOutdoorTimeCard(
     val best = remember(hours) { findBestOutdoorWindow(hours) }
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Text("КОЛИ КРАЩЕ ВИЙТИ НАДВІР?", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.3.sp)
         Spacer(Modifier.height(10.dp))
@@ -774,18 +792,7 @@ fun TodayTomorrowCard(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Text("СЬОГОДНІ ТА ЗАВТРА", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.4.sp)
         Spacer(Modifier.height(14.dp))
@@ -811,13 +818,16 @@ private fun DailyOutlookColumn(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.06f))
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.15f),
+                        Color.White.copy(alpha = 0.055f)
                     )
                 )
-                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+            )
+            .border(0.8.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(16.dp))
             .padding(12.dp)
     ) {
         Text(title, color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
@@ -851,18 +861,7 @@ fun Forecast48Card(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Text("ДЕТАЛЬНИЙ ПРОГНОЗ НА 48 ГОДИН", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.4.sp)
         Spacer(Modifier.height(12.dp))
@@ -894,14 +893,7 @@ private fun Forecast48Row(hours: List<HourForecast>, useCelsius: Boolean) {
             Column(
                 modifier = Modifier
                     .width(76.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.17f), Color.White.copy(alpha = 0.07f))
-                    )
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.13f), RoundedCornerShape(14.dp))
-                    .padding(vertical = 10.dp, horizontal = 6.dp),
+                    .oceanGlass(14.dp, 0.10f).padding(vertical = 10.dp, horizontal = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(hour.time, color = mutedWhite, fontSize = 12.sp)
@@ -941,18 +933,7 @@ fun PrecipitationCard(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Text("ОПАДИ НА 24 ГОДИНИ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.6.sp)
         Spacer(Modifier.height(8.dp))
@@ -1026,18 +1007,7 @@ fun TemperatureTrendCard(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -1146,18 +1116,7 @@ fun VisibilityCard(
     val fog = weatherCode == 45 || weatherCode == 48
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("◉", color = cream, fontSize = 22.sp)
@@ -1210,18 +1169,7 @@ fun AtmosphereCard(
     }
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Text("СТАН АТМОСФЕРИ", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.4.sp)
         Spacer(Modifier.height(12.dp))
@@ -1229,14 +1177,7 @@ fun AtmosphereCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.06f))
-                    )
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
-                    .padding(12.dp)
+                    .oceanGlass(16.dp, 0.10f).padding(12.dp)
             ) {
                 Text("ТОЧКА РОСИ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 0.8.sp)
                 Spacer(Modifier.height(5.dp))
@@ -1246,14 +1187,7 @@ fun AtmosphereCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.06f))
-                    )
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
-                    .padding(12.dp)
+                    .oceanGlass(16.dp, 0.10f).padding(12.dp)
             ) {
                 Text("ХМАРНІСТЬ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 0.8.sp)
                 Spacer(Modifier.height(5.dp))
@@ -1281,18 +1215,7 @@ fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp))
-            .padding(16.dp)
+            .oceanGlass(22.dp).padding(16.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -1354,11 +1277,14 @@ fun AirQualityCard(air: AirQuality, modifier: Modifier = Modifier) {
 
 @Composable
 fun WeatherMetric(title: String, value: String, iconRes: Int, modifier: Modifier = Modifier) {
-    Column(modifier.clip(RoundedCornerShape(18.dp)).background(Color.White.copy(alpha = .13f)).padding(15.dp)) {
-        Image(painter = painterResource(iconRes), contentDescription = title, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.height(7.dp))
-        Text(value, color = cream, fontSize = 21.sp, fontWeight = FontWeight.Medium)
-        Text(title, color = mutedWhite, fontSize = 12.sp)
+    Column(
+        modifier.oceanGlass(24.dp, 0.25f).padding(horizontal = 18.dp, vertical = 17.dp)
+    ) {
+        Image(painter = painterResource(iconRes), contentDescription = title, modifier = Modifier.size(31.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(value, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(2.dp))
+        Text(title, color = Color.White.copy(alpha = 0.86f), fontSize = 13.sp)
     }
 }
 
@@ -1372,17 +1298,7 @@ private fun PressureCard(pressureHpa: Double, modifier: Modifier = Modifier) {
         else -> "Нормальний"
     }
     Column(
-        modifier = modifier.clip(RoundedCornerShape(18.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp)).padding(15.dp)
+        modifier = modifier.oceanGlass(24.dp, 0.25f).height(148.dp).padding(17.dp)
     ) {
         Text("АТМОСФЕРНИЙ ТИСК", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
         Spacer(Modifier.height(8.dp))
@@ -1397,22 +1313,12 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
     val normalized = ((direction % 360) + 360) % 360
     val compass = directions[((normalized + 22) / 45) % 8]
     Column(
-        modifier = modifier.clip(RoundedCornerShape(18.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp)).padding(15.dp),
+        modifier = modifier.oceanGlass(24.dp, 0.25f).height(148.dp).padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("НАПРЯМОК ВІТРУ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
         Spacer(Modifier.height(3.dp))
-        Canvas(Modifier.size(43.dp)) {
+        Canvas(Modifier.size(38.dp)) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val radius = size.minDimension * 0.40f
             drawCircle(color = Color.White.copy(alpha = 0.28f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
@@ -1423,7 +1329,7 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
             drawLine(color = Color(0xFFFFC978), start = center, end = tip, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
             drawCircle(color = cream, radius = 3.dp.toPx(), center = center)
         }
-        Text(compass, color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+        Text(compass, color = cream, fontSize = 18.sp, fontWeight = FontWeight.Medium)
         Text("$normalized°", color = mutedWhite, fontSize = 11.sp)
     }
 }
@@ -1434,10 +1340,10 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
         Modifier.fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.0f to Color(0xFF073F49),
-                        0.52f to Color(0xFF10958F),
-                        1.0f to Color(0xFF103D52)
+                    colors = listOf(
+                        Color(0xFF063B46),
+                        Color(0xFF087E83),
+                        Color(0xFF123D50)
                     )
                 )
             )
@@ -1453,7 +1359,7 @@ fun SettingsScreen(useCelsius: Boolean, onCelsiusChange: (Boolean) -> Unit, onBa
             Switch(checked = useCelsius, onCheckedChange = onCelsiusChange)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Версія 1.8", color = mutedWhite)
+        Text("Версія 1.12", color = mutedWhite)
         Text("Погодні дані надає Open-Meteo", color = mutedWhite, fontSize = 12.sp)
     }
 }
@@ -1521,17 +1427,7 @@ fun SolarUvCard(solar: SolarUv, modifier: Modifier = Modifier) {
         else -> Triple("Екстремальний", "Уникай прямого сонця, шукай тінь та використовуй SPF 50+", Color(0xFFB66ACB))
     }
     Column(
-        modifier = modifier.clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.23f),
-                        Color.White.copy(alpha = 0.10f),
-                        Color(0xFFB8FFF2).copy(alpha = 0.14f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(20.dp)).padding(16.dp)
+        modifier = modifier.oceanGlass(22.dp).padding(16.dp)
     ) {
         Text("СОНЦЕ ТА УФ-ІНДЕКС", color = mutedWhite, fontSize = 12.sp, letterSpacing = 1.8.sp)
         Spacer(Modifier.height(12.dp))
