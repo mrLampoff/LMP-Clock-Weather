@@ -1298,7 +1298,7 @@ private fun PressureCard(pressureHpa: Double, modifier: Modifier = Modifier) {
         else -> "Нормальний"
     }
     Column(
-        modifier = modifier.oceanGlass(24.dp, 0.20f).height(148.dp).padding(17.dp)
+        modifier = modifier.oceanGlass(24.dp, 0.20f).height(126.dp).padding(15.dp)
     ) {
         Text("АТМОСФЕРНИЙ ТИСК", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
         Spacer(Modifier.height(8.dp))
@@ -1313,12 +1313,12 @@ private fun WindDirectionCard(direction: Int, modifier: Modifier = Modifier) {
     val normalized = ((direction % 360) + 360) % 360
     val compass = directions[((normalized + 22) / 45) % 8]
     Column(
-        modifier = modifier.oceanGlass(24.dp, 0.20f).height(148.dp).padding(14.dp),
+        modifier = modifier.oceanGlass(24.dp, 0.20f).height(126.dp).padding(13.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("НАПРЯМОК ВІТРУ", color = mutedWhite, fontSize = 10.sp, letterSpacing = 1.sp)
-        Spacer(Modifier.height(3.dp))
-        Canvas(Modifier.size(38.dp)) {
+        Spacer(Modifier.height(2.dp))
+        Canvas(Modifier.size(34.dp)) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val radius = size.minDimension * 0.40f
             drawCircle(color = Color.White.copy(alpha = 0.28f), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
