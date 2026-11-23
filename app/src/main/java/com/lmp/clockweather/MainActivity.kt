@@ -39,6 +39,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -494,7 +495,58 @@ fun MainWeatherScreen(
         )
     )
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(background).navigationBarsPadding(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(background)
+            .drawBehind {
+                val w = size.width
+                val h = size.height
+
+                val farRange = Path().apply {
+                    moveTo(0f, h * 0.31f)
+                    cubicTo(w * 0.16f, h * 0.28f, w * 0.22f, h * 0.20f, w * 0.40f, h * 0.24f)
+                    cubicTo(w * 0.58f, h * 0.28f, w * 0.68f, h * 0.19f, w * 0.82f, h * 0.22f)
+                    cubicTo(w * 0.91f, h * 0.23f, w * 0.96f, h * 0.20f, w, h * 0.19f)
+                    lineTo(w, h)
+                    lineTo(0f, h)
+                    close()
+                }
+                drawPath(
+                    path = farRange,
+                    brush = Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color(0xFF0A5360).copy(alpha = 0.20f),
+                            0.35f to Color(0xFF087C80).copy(alpha = 0.12f),
+                            1.0f to Color(0xFF0A8C83).copy(alpha = 0.02f)
+                        ),
+                        startY = h * 0.18f,
+                        endY = h * 0.62f
+                    )
+                )
+
+                val nearRange = Path().apply {
+                    moveTo(0f, h * 0.40f)
+                    cubicTo(w * 0.14f, h * 0.37f, w * 0.27f, h * 0.30f, w * 0.43f, h * 0.34f)
+                    cubicTo(w * 0.60f, h * 0.38f, w * 0.72f, h * 0.31f, w * 0.86f, h * 0.34f)
+                    cubicTo(w * 0.93f, h * 0.35f, w * 0.97f, h * 0.33f, w, h * 0.32f)
+                    lineTo(w, h)
+                    lineTo(0f, h)
+                    close()
+                }
+                drawPath(
+                    path = nearRange,
+                    brush = Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color(0xFF064B5B).copy(alpha = 0.22f),
+                            0.28f to Color(0xFF087B7D).copy(alpha = 0.15f),
+                            1.0f to Color(0xFF07958A).copy(alpha = 0.015f)
+                        ),
+                        startY = h * 0.30f,
+                        endY = h * 0.70f
+                    )
+                )
+            }
+            .navigationBarsPadding(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
