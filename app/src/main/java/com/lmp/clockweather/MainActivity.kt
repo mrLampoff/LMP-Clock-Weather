@@ -1995,8 +1995,8 @@ private fun RadarScreen(
         <html>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+          <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
           <style>
             html, body, #map { height:100%; width:100%; margin:0; padding:0; background:#073e50; }
             .panel {
@@ -2023,11 +2023,18 @@ private fun RadarScreen(
             </div>
           </div>
           <script>
-            const map = L.map('map', { zoomControl:true, maxZoom:12 }).setView([$latitude, $longitude], 6);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              maxZoom:19,
-              attribution:'© OpenStreetMap contributors'
-            }).addTo(map);
+            let map;
+            try {
+              if (typeof L === 'undefined') throw new Error('Leaflet не завантажився');
+              map = L.map('map', { zoomControl:true, maxZoom:12 }).setView([$latitude, $longitude], 6);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom:19,
+                attribution:'© OpenStreetMap contributors'
+              }).addTo(map);
+            } catch (e) {
+              document.getElementById('time').textContent='Помилка карти: '+e.message;
+              throw e;
+            }
             let frames=[], pos=0, radar=null, timer=null;
             function timeLabel(ts) {
               return new Date(ts*1000).toLocaleString('uk-UA',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
@@ -2057,13 +2064,16 @@ private fun RadarScreen(
             fetch('https://api.rainviewer.com/public/weather-maps.json')
               .then(r=>{if(!r.ok) throw new Error('HTTP '+r.status); return r.json();})
               .then(data=>{
+                if(!data.host || !data.radar || !Array.isArray(data.radar.past)) {
+                  throw new Error('Невірний формат відповіді RainViewer');
+                }
                 window.radarHost=data.host;
-                frames=(data.radar && data.radar.past ? data.radar.past : []);
-                if(!frames.length) throw new Error('Немає доступних радарних кадрів');
+                frames=data.radar.past.filter(f=>f && f.path && f.time);
+                if(!frames.length) throw new Error('Наразі немає доступних радарних кадрів');
                 showFrame(frames.length-1);
               })
               .catch(e=>{
-                document.getElementById('time').textContent='Не вдалося завантажити радар. Перевірте інтернет і спробуйте ще раз.';
+                document.getElementById('time').textContent='Помилка завантаження радара: '+e.message;
               });
           </script>
         </body>
@@ -2094,9 +2104,28 @@ private fun RadarScreen(
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.loadsImagesAutomatically = true
                     settings.loadWithOverviewMode = true
                     settings.useWideViewPort = true
-                    webViewClient = WebViewClient()
+                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    setBackgroundColor(android.graphics.Color.rgb(7, 62, 80))
+                    webChromeClient = object : android.webkit.WebChromeClient() {
+                        override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
+                            android.util.Log.e("LMP_RADAR", "${message.message()} -- line ${message.lineNumber()}")
+                            return true
+                        }
+                    }
+                    webViewClient = object : WebViewClient() {
+                        override fun onReceivedError(
+                            view: WebView,
+                            request: android.webkit.WebResourceRequest,
+                            error: android.webkit.WebResourceError
+                        ) {
+                            if (request.isForMainFrame) {
+                                android.util.Log.e("LMP_RADAR", "WebView error: ${error.description}")
+                            }
+                        }
+                    }
                     loadDataWithBaseURL("https://www.rainviewer.com/", html, "text/html", "UTF-8", null)
                 }
             },
