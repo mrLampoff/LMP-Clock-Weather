@@ -2177,7 +2177,7 @@ private fun RadarScreen(
                             }
                         }
                     }
-                    loadDataWithBaseURL("https://www.rainviewer.com/", html, "text/html", "UTF-8", null)
+                    loadUrl("https://www.openstreetmap.org")
                 }
             },
             update = { view ->
