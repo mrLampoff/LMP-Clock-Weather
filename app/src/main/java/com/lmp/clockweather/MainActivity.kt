@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -501,6 +503,18 @@ fun LmpWeatherApp() {
             error = error,
             locationName = locationName,
             useCelsius = useCelsius,
+            onSwipeCity = { direction ->
+                if (cityList.isNotEmpty()) {
+                    val currentIndex = cityList.indexOfFirst { it.name == locationName }
+                    val targetIndex = when {
+                        currentIndex < 0 && direction > 0 -> cityList.lastIndex
+                        currentIndex < 0 -> 0
+                        else -> (currentIndex + direction + cityList.size) % cityList.size
+                    }
+                    val targetCity = cityList[targetIndex]
+                    load(targetCity.latitude, targetCity.longitude, targetCity.name)
+                }
+            },
             onRefresh = {
                 // Refresh using the last detected location instead of silently reverting to Kyiv.
                 val saved = LocationStore.get(context)
@@ -579,7 +593,8 @@ private fun Modifier.oceanGlass(
 @Composable
 fun MainWeatherScreen(
     weather: WeatherBundle?, loading: Boolean, error: String, locationName: String,
-    useCelsius: Boolean, onRefresh: () -> Unit, onSettings: () -> Unit,
+    useCelsius: Boolean, onSwipeCity: (Int) -> Unit,
+    onRefresh: () -> Unit, onSettings: () -> Unit,
     onLocation: () -> Unit
 ) {
     var clockNow by remember { mutableStateOf(Date()) }
@@ -591,9 +606,26 @@ fun MainWeatherScreen(
             Color(0xFF079B91)
         )
     )
+    var horizontalDrag by remember { mutableStateOf(0f) }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .pointerInput(locationName) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        horizontalDrag += dragAmount
+                    },
+                    onDragEnd = {
+                        when {
+                            horizontalDrag <= -80f -> onSwipeCity(1)
+                            horizontalDrag >= 80f -> onSwipeCity(-1)
+                        }
+                        horizontalDrag = 0f
+                    },
+                    onDragCancel = { horizontalDrag = 0f }
+                )
+            }
             .background(background)
             .paint(
                 painter = painterResource(R.drawable.mountain_ocean_background),
