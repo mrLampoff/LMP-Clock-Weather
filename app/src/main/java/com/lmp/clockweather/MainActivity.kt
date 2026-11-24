@@ -18,6 +18,7 @@ import android.app.Activity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -29,6 +30,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -236,6 +240,9 @@ fun LmpWeatherApp() {
     }
 
     var showCities by remember { mutableStateOf(false) }
+    var showRadar by remember { mutableStateOf(false) }
+    var currentLatitude by remember { mutableStateOf(50.4501) }
+    var currentLongitude by remember { mutableStateOf(30.5234) }
     var cityList by remember { mutableStateOf(savedCities(context)) }
 
     // Завантаження погоди
@@ -255,6 +262,8 @@ fun LmpWeatherApp() {
 
                 weather = result
                 locationName = city
+                currentLatitude = lat
+                currentLongitude = lon
 
             } catch (e: Exception) {
                 error = "Не вдалося отримати погоду. Перевір підключення до інтернету."
@@ -480,7 +489,15 @@ fun LmpWeatherApp() {
     }
 
     // Відображення екранів
-    if (showSettings) {
+    if (showRadar) {
+        BackHandler { showRadar = false }
+        RadarScreen(
+            latitude = currentLatitude,
+            longitude = currentLongitude,
+            cityName = locationName,
+            onBack = { showRadar = false }
+        )
+    } else if (showSettings) {
 
         SettingsScreen(
             useCelsius = useCelsius,
@@ -515,6 +532,7 @@ fun LmpWeatherApp() {
                     load(targetCity.latitude, targetCity.longitude, targetCity.name)
                 }
             },
+            onRadar = { showRadar = true },
             onRefresh = {
                 // Refresh using the last detected location instead of silently reverting to Kyiv.
                 val saved = LocationStore.get(context)
@@ -594,6 +612,7 @@ private fun Modifier.oceanGlass(
 fun MainWeatherScreen(
     weather: WeatherBundle?, loading: Boolean, error: String, locationName: String,
     useCelsius: Boolean, onSwipeCity: (Int) -> Unit,
+    onRadar: () -> Unit,
     onRefresh: () -> Unit, onSettings: () -> Unit,
     onLocation: () -> Unit
 ) {
@@ -667,7 +686,14 @@ fun MainWeatherScreen(
                 Spacer(Modifier.width(4.dp))
                 Text(locationName, color = cream, fontSize = 18.sp)
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = onRadar,
+                modifier = Modifier.oceanGlass(radius = 18.dp, fillAlpha = 0.18f)
+            ) {
+                Text("◉  МЕТЕОРАДАР", color = cream, fontSize = 12.sp, letterSpacing = 1.2.sp)
+            }
+            Spacer(Modifier.height(16.dp))
             if (weather != null) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     Box(
@@ -1952,5 +1978,134 @@ private fun getCityName(
 
     } catch (e: Exception) {
         "Моє місцезнаходження"
+    }
+}
+
+@Composable
+private fun RadarScreen(
+    latitude: Double,
+    longitude: Double,
+    cityName: String,
+    onBack: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val html = remember(latitude, longitude) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <style>
+            html, body, #map { height:100%; width:100%; margin:0; padding:0; background:#073e50; }
+            .panel {
+              position:absolute; z-index:1000; left:12px; right:12px; bottom:18px;
+              padding:12px 14px; border-radius:18px; color:#f3fffd;
+              background:rgba(4,45,59,.88); border:1px solid rgba(210,255,249,.35);
+              font-family:Arial,sans-serif; box-shadow:0 4px 18px rgba(0,0,0,.25);
+            }
+            .controls { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:8px; }
+            button { border:1px solid rgba(220,255,250,.45); border-radius:12px; padding:9px 15px;
+              color:white; background:rgba(24,145,151,.65); font-size:17px; }
+            #time { text-align:center; font-size:13px; opacity:.9; }
+            .leaflet-control-attribution { font-size:9px!important; }
+          </style>
+        </head>
+        <body>
+          <div id="map"></div>
+          <div class="panel">
+            <div id="time">Завантаження радарних даних…</div>
+            <div class="controls">
+              <button onclick="step(-1)">‹</button>
+              <button id="play" onclick="togglePlay()">▶</button>
+              <button onclick="step(1)">›</button>
+            </div>
+          </div>
+          <script>
+            const map = L.map('map', { zoomControl:true, maxZoom:12 }).setView([$latitude, $longitude], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom:19,
+              attribution:'© OpenStreetMap contributors'
+            }).addTo(map);
+            let frames=[], pos=0, radar=null, timer=null;
+            function timeLabel(ts) {
+              return new Date(ts*1000).toLocaleString('uk-UA',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+            }
+            function showFrame(i) {
+              if (!frames.length) return;
+              pos=(i+frames.length)%frames.length;
+              const f=frames[pos];
+              if (radar) map.removeLayer(radar);
+              radar=L.tileLayer(window.radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png',{
+                tileSize:256, maxNativeZoom:7, maxZoom:12, opacity:0.78, attribution:'Weather data © RainViewer'
+              }).addTo(map);
+              document.getElementById('time').textContent='Радар: '+timeLabel(f.time)+' · '+(pos+1)+'/'+frames.length;
+            }
+            function stop() {
+              if(timer) clearInterval(timer);
+              timer=null;
+              document.getElementById('play').textContent='▶';
+            }
+            function togglePlay() {
+              if(timer) { stop(); return; }
+              if(frames.length<2) return;
+              document.getElementById('play').textContent='Ⅱ';
+              timer=setInterval(()=>showFrame(pos+1),700);
+            }
+            function step(d) { stop(); showFrame(pos+d); }
+            fetch('https://api.rainviewer.com/public/weather-maps.json')
+              .then(r=>{if(!r.ok) throw new Error('HTTP '+r.status); return r.json();})
+              .then(data=>{
+                window.radarHost=data.host;
+                frames=(data.radar && data.radar.past ? data.radar.past : []);
+                if(!frames.length) throw new Error('Немає доступних радарних кадрів');
+                showFrame(frames.length-1);
+              })
+              .catch(e=>{
+                document.getElementById('time').textContent='Не вдалося завантажити радар. Перевірте інтернет і спробуйте ще раз.';
+              });
+          </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    Column(
+        Modifier.fillMaxSize()
+            .background(Color(0xFF063B4A))
+            .navigationBarsPadding()
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onBack) {
+                Text("‹  Назад", color = cream, fontSize = 16.sp)
+            }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Метеорадар", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                Text(cityName, color = mutedWhite, fontSize = 12.sp)
+            }
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    webViewClient = WebViewClient()
+                    loadDataWithBaseURL("https://www.rainviewer.com/", html, "text/html", "UTF-8", null)
+                }
+            },
+            update = { view ->
+                if (view.tag != html) {
+                    view.tag = html
+                    view.loadDataWithBaseURL("https://www.rainviewer.com/", html, "text/html", "UTF-8", null)
+                }
+            }
+        )
     }
 }
