@@ -1,3 +1,4 @@
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,12 +17,18 @@ android {
         versionName = "1.0"
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
@@ -34,6 +41,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+
     implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // MapLibre Native Android: OpenGL ES
+    implementation("org.maplibre.gl:android-sdk-opengl:13.7.1")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
 }
