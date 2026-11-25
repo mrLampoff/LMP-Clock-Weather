@@ -1990,52 +1990,182 @@ private fun RadarScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Тимчасова тестова сторінка. Вона не використовує інтернет,
-    // Leaflet або RainViewer. Перевіряємо лише відображення WebView.
-    val testHtml = remember {
+    // Leaflet + OpenStreetMap + актуальний RainViewer Weather Maps API.
+    // RainViewer наразі надає лише минулі кадри, без nowcast.
+    val html = remember(latitude, longitude) {
         """
         <!DOCTYPE html>
         <html lang="uk">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                html, body {
-                    width: 100%;
-                    height: 100%;
-                    margin: 0;
-                    padding: 0;
-                    background: #063B4A;
-                    color: #FFF8EF;
-                    font-family: Arial, sans-serif;
-                }
-                body {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    text-align: center;
-                }
-                .content {
-                    padding: 28px;
-                }
-                h1 {
-                    font-size: 28px;
-                    font-weight: 600;
-                    margin-bottom: 14px;
-                }
-                p {
-                    font-size: 17px;
-                    line-height: 1.5;
-                    color: rgba(255,255,255,0.82);
-                }
-            </style>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+          <style>
+            html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; background:#0b5266; }
+            #map { position:absolute; inset:0; width:100%; height:100%; background:#0b5266; }
+            .panel {
+              position:absolute; z-index:1000; left:12px; right:12px; bottom:16px;
+              padding:12px 14px; border-radius:18px; color:#f3fffd;
+              background:rgba(4,45,59,.94); border:1px solid rgba(210,255,249,.45);
+              font-family:Arial,sans-serif; box-shadow:0 4px 18px rgba(0,0,0,.28);
+            }
+            #status { text-align:center; font-size:13px; line-height:1.4; min-height:18px; }
+            .controls { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:9px; }
+            button { min-width:48px; border:1px solid rgba(220,255,250,.55); border-radius:12px;
+              padding:9px 15px; color:white; background:rgba(24,145,151,.9); font-size:18px; }
+            button:disabled { opacity:.45; }
+            #credit { text-align:center; font-size:10px; opacity:.78; margin-top:7px; }
+            .leaflet-control-attribution { font-size:9px!important; }
+            .leaflet-container { font-family:Arial,sans-serif; }
+          </style>
         </head>
         <body>
-            <div class="content">
-                <h1>WEBVIEW ПРАЦЮЄ</h1>
-                <p>Тестова сторінка LMP Clock &amp; Weather</p>
-                <p>Якщо ти бачиш цей текст, WebView відображає HTML.</p>
+          <div id="map"></div>
+          <div class="panel">
+            <div id="status">Завантаження карти та радарних даних…</div>
+            <div class="controls">
+              <button id="prev" onclick="stepFrame(-1)" disabled>‹</button>
+              <button id="play" onclick="togglePlay()" disabled>▶</button>
+              <button id="next" onclick="stepFrame(1)" disabled>›</button>
+              <button id="refresh" onclick="reloadRadar()">↻</button>
             </div>
+            <div id="credit">Карта © OpenStreetMap · Радар © RainViewer</div>
+          </div>
+          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <script>
+            (function() {
+              var statusEl = document.getElementById('status');
+              var playButton = document.getElementById('play');
+              var prevButton = document.getElementById('prev');
+              var nextButton = document.getElementById('next');
+              var map = null;
+              var frames = [];
+              var frameIndex = 0;
+              var radarLayer = null;
+              var playTimer = null;
+              var radarHost = '';
+
+              function setStatus(message) { statusEl.textContent = message; }
+              function setControls(enabled) {
+                playButton.disabled = !enabled;
+                prevButton.disabled = !enabled;
+                nextButton.disabled = !enabled;
+              }
+              function stopPlayback() {
+                if (playTimer !== null) window.clearInterval(playTimer);
+                playTimer = null;
+                playButton.textContent = '▶';
+              }
+              function formatTime(timestamp) {
+                return new Date(timestamp * 1000).toLocaleString('uk-UA', {
+                  day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
+                });
+              }
+              function showFrame(index) {
+                if (!frames.length || !map) return;
+                frameIndex = (index + frames.length) % frames.length;
+                var frame = frames[frameIndex];
+                if (radarLayer) map.removeLayer(radarLayer);
+
+                // Шлях беремо безпосередньо з API: він може бути хешем, а не timestamp.
+                var tileUrl = radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
+                var tileErrors = 0;
+                radarLayer = L.tileLayer(tileUrl, {
+                  tileSize:256,
+                  minZoom:2,
+                  maxNativeZoom:7,
+                  maxZoom:12,
+                  opacity:0.82,
+                  updateWhenIdle:true,
+                  keepBuffer:2,
+                  attribution:'Weather data © RainViewer'
+                });
+                radarLayer.on('tileerror', function() {
+                  tileErrors++;
+                  if (tileErrors >= 3) {
+                    setStatus('Радарні зображення наразі недоступні в цій області.');
+                  }
+                });
+                radarLayer.addTo(map);
+                setStatus('Радар: ' + formatTime(frame.time) + ' · кадр ' + (frameIndex + 1) + ' із ' + frames.length);
+              }
+              window.stepFrame = function(direction) {
+                if (!frames.length) return;
+                stopPlayback();
+                showFrame(frameIndex + direction);
+              };
+              window.togglePlay = function() {
+                if (playTimer !== null) { stopPlayback(); return; }
+                if (frames.length < 2) return;
+                playButton.textContent = 'Ⅱ';
+                playTimer = window.setInterval(function() {
+                  showFrame(frameIndex + 1);
+                }, 850);
+              };
+              window.reloadRadar = function() {
+                stopPlayback();
+                loadRadarFrames();
+              };
+
+              function initMap() {
+                if (typeof L === 'undefined') {
+                  setStatus('Не завантажилася бібліотека карти. Перевір інтернет або доступ до unpkg.com.');
+                  return false;
+                }
+                try {
+                  map = L.map('map', { zoomControl:true, maxZoom:12, preferCanvas:true })
+                    .setView([$latitude, $longitude], 6);
+                  window.lmpRadarMap = map;
+                  var baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    minZoom:2, maxZoom:19, attribution:'© OpenStreetMap contributors',
+                    crossOrigin:true
+                  }).addTo(map);
+                  baseLayer.on('tileerror', function() {
+                    setStatus('Не вдалося завантажити фрагменти базової карти. Перевір інтернет-з’єднання.');
+                  });
+                  map.whenReady(function() {
+                    window.setTimeout(function() { map.invalidateSize(true); }, 250);
+                    window.setTimeout(function() { map.invalidateSize(true); }, 1000);
+                  });
+                  window.addEventListener('resize', function() {
+                    if (map) window.setTimeout(function() { map.invalidateSize(true); }, 150);
+                  });
+                  return true;
+                } catch (error) {
+                  setStatus('Помилка ініціалізації карти: ' + error.message);
+                  return false;
+                }
+              }
+
+              function loadRadarFrames() {
+                setControls(false);
+                setStatus('Завантаження радарних кадрів…');
+                fetch('https://api.rainviewer.com/public/weather-maps.json', { cache:'no-store' })
+                  .then(function(response) {
+                    if (!response.ok) throw new Error('RainViewer HTTP ' + response.status);
+                    return response.json();
+                  })
+                  .then(function(data) {
+                    if (!data.host || !data.radar || !Array.isArray(data.radar.past)) {
+                      throw new Error('Сервер повернув дані невідомого формату');
+                    }
+                    radarHost = data.host;
+                    frames = data.radar.past.filter(function(frame) {
+                      return frame && typeof frame.path === 'string' && frame.path.length > 0 && Number(frame.time) > 0;
+                    }).sort(function(a, b) { return a.time - b.time; });
+                    if (!frames.length) throw new Error('Наразі немає доступних радарних кадрів');
+                    setControls(true);
+                    showFrame(frames.length - 1);
+                  })
+                  .catch(function(error) {
+                    setControls(false);
+                    setStatus('Не вдалося отримати радар: ' + (error.message || 'невідома помилка') + '. Натисни ↻ для повтору.');
+                  });
+              }
+
+              if (initMap()) loadRadarFrames();
+            })();
+          </script>
         </body>
         </html>
         """.trimIndent()
@@ -2061,7 +2191,7 @@ private fun RadarScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Тест WebView",
+                    "Метеорадар",
                     color = cream,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Medium
@@ -2076,15 +2206,72 @@ private fun RadarScreen(
                 .fillMaxWidth(),
             factory = {
                 WebView(context).apply {
-                    settings.javaScriptEnabled = false
-                    settings.domStorageEnabled = false
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
                     settings.loadsImagesAutomatically = true
-                    setBackgroundColor(android.graphics.Color.rgb(6, 59, 74))
-                    webViewClient = WebViewClient()
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.allowFileAccess = false
+                    settings.javaScriptCanOpenWindowsAutomatically = false
+                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    setBackgroundColor(android.graphics.Color.rgb(7, 62, 80))
+                    webChromeClient = object : android.webkit.WebChromeClient() {
+                        override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
+                            android.util.Log.e(
+                                "LMP_RADAR",
+                                "${message.message()} -- line ${message.lineNumber()}"
+                            )
+                            return true
+                        }
+                    }
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) {
+                            super.onPageFinished(view, url)
+                            view.evaluateJavascript(
+                                "if (window.lmpRadarMap) { window.lmpRadarMap.invalidateSize(true); }",
+                                null
+                            )
+                        }
 
+                        override fun onReceivedError(
+                            view: WebView,
+                            request: android.webkit.WebResourceRequest,
+                            error: android.webkit.WebResourceError
+                        ) {
+                            if (request.isForMainFrame) {
+                                android.util.Log.e(
+                                    "LMP_RADAR",
+                                    "Main frame error: ${error.description}"
+                                )
+                            }
+                        }
+
+                        override fun onReceivedHttpError(
+                            view: WebView,
+                            request: android.webkit.WebResourceRequest,
+                            errorResponse: android.webkit.WebResourceResponse
+                        ) {
+                            android.util.Log.e(
+                                "LMP_RADAR",
+                                "HTTP ${errorResponse.statusCode}: ${request.url}"
+                            )
+                        }
+                    }
                     loadDataWithBaseURL(
-                        null,
-                        testHtml,
+                        "https://www.rainviewer.com/",
+                        html,
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
+                }
+            },
+            update = { view ->
+                if (view.tag != html) {
+                    view.tag = html
+                    view.loadDataWithBaseURL(
+                        "https://www.rainviewer.com/",
+                        html,
                         "text/html",
                         "UTF-8",
                         null
