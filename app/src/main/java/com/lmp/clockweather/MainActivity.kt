@@ -31,8 +31,20 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import android.content.ContextWrapper
+import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.RasterLayer
+import org.maplibre.android.style.sources.RasterSource
+import org.maplibre.android.style.sources.TileSet
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1981,6 +1993,99 @@ private fun getCityName(
     }
 }
 
+private data class RadarFrame(
+    val time: Long,
+    val path: String
+)
+
+private data class RadarFramesResponse(
+    val host: String,
+    val frames: List<RadarFrame>
+)
+
+private suspend fun fetchRainViewerFrames(): RadarFramesResponse = withContext(Dispatchers.IO) {
+    val connection = (URL("https://api.rainviewer.com/public/weather-maps.json").openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 12000
+        readTimeout = 12000
+        setRequestProperty("Accept", "application/json")
+        setRequestProperty("User-Agent", "LMP-Clock-Weather-Android")
+    }
+    try {
+        val code = connection.responseCode
+        if (code !in 200..299) throw IllegalStateException("RainViewer HTTP $code")
+        val body = connection.inputStream.bufferedReader().use { it.readText() }
+        val root = JSONObject(body)
+        val host = root.optString("host").trimEnd('/')
+        if (host.isBlank()) throw IllegalStateException("RainViewer не повернув адресу тайлів")
+        val past = root.optJSONObject("radar")?.optJSONArray("past")
+            ?: throw IllegalStateException("RainViewer не повернув список радарних кадрів")
+        val frames = (0 until past.length()).mapNotNull { index ->
+            val item = past.optJSONObject(index) ?: return@mapNotNull null
+            val time = item.optLong("time", 0L)
+            val path = item.optString("path")
+            if (time > 0L && path.startsWith("/")) RadarFrame(time, path) else null
+        }.sortedBy { it.time }
+        if (frames.isEmpty()) throw IllegalStateException("Немає доступних радарних кадрів")
+        RadarFramesResponse(host, frames)
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun Context.findLifecycleOwner(): LifecycleOwner? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is LifecycleOwner) return current
+        current = current.baseContext
+    }
+    return current as? LifecycleOwner
+}
+
+private fun createLmpBaseMapStyle(): String {
+    val osmSource = JSONObject().apply {
+        put("type", "raster")
+        put("tiles", org.json.JSONArray().put("https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
+        put("tileSize", 256)
+        put("minzoom", 0)
+        put("maxzoom", 19)
+        put("attribution", "© OpenStreetMap contributors")
+    }
+    val osmLayer = JSONObject().apply {
+        put("id", "osm-base-layer")
+        put("type", "raster")
+        put("source", "osm-base")
+    }
+    return JSONObject().apply {
+        put("version", 8)
+        put("name", "LMP Clock & Weather Radar")
+        put("sources", JSONObject().put("osm-base", osmSource))
+        put("layers", org.json.JSONArray().put(osmLayer))
+    }.toString()
+}
+
+private fun applyRainViewerFrame(
+    style: Style,
+    host: String,
+    frame: RadarFrame
+) {
+    // Replace only the radar source/layer. The OSM base map and camera stay untouched.
+    runCatching { style.removeLayer("rainviewer-radar-layer") }
+    runCatching { style.removeSource("rainviewer-radar-source") }
+
+    val tileUrl = "$host${frame.path}/256/{z}/{x}/{y}/2/1_1.png"
+    val tileSet = TileSet("2.2.0", tileUrl).apply {
+        attribution = "Weather data © RainViewer"
+        setMinZoom(0f)
+        setMaxZoom(7f)
+    }
+    style.addSource(RasterSource("rainviewer-radar-source", tileSet, 256))
+    style.addLayer(
+        RasterLayer("rainviewer-radar-layer", "rainviewer-radar-source")
+            .withProperties(PropertyFactory.rasterOpacity(0.78f))
+    )
+}
+
 @Composable
 private fun RadarScreen(
     latitude: Double,
@@ -1989,187 +2094,87 @@ private fun RadarScreen(
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = remember(context) { context.findLifecycleOwner() }
 
-    // Leaflet + OpenStreetMap + актуальний RainViewer Weather Maps API.
-    // RainViewer наразі надає лише минулі кадри, без nowcast.
-    val html = remember(latitude, longitude) {
-        """
-        <!DOCTYPE html>
-        <html lang="uk">
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';">
-          <style>
-            html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; background:#0b5266; }
-            #map { position:absolute; inset:0; width:100%; height:100%; background:#0b5266; }
-            .panel {
-              position:absolute; z-index:1000; left:12px; right:12px; bottom:16px;
-              padding:12px 14px; border-radius:18px; color:#f3fffd;
-              background:rgba(4,45,59,.94); border:1px solid rgba(210,255,249,.45);
-              font-family:Arial,sans-serif; box-shadow:0 4px 18px rgba(0,0,0,.28);
+    var mapView by remember { mutableStateOf<MapView?>(null) }
+    var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
+    var mapStyle by remember { mutableStateOf<Style?>(null) }
+    var radarHost by remember { mutableStateOf("") }
+    var radarFrames by remember { mutableStateOf<List<RadarFrame>>(emptyList()) }
+    var currentFrameIndex by remember { mutableIntStateOf(0) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("Підготовка нативної карти…") }
+    var refreshToken by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(lifecycleOwner, mapView) {
+        val view = mapView
+        val owner = lifecycleOwner
+        if (view == null || owner == null) {
+            onDispose { }
+        } else {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_START -> view.onStart()
+                    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> view.onResume()
+                    androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> view.onPause()
+                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> view.onStop()
+                    androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> view.onDestroy()
+                    else -> Unit
+                }
             }
-            #status { text-align:center; font-size:13px; line-height:1.4; min-height:18px; }
-            .controls { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:9px; }
-            button { min-width:48px; border:1px solid rgba(220,255,250,.55); border-radius:12px;
-              padding:9px 15px; color:white; background:rgba(24,145,151,.9); font-size:18px; }
-            button:disabled { opacity:.45; }
-            #credit { text-align:center; font-size:10px; opacity:.78; margin-top:7px; }
-            .leaflet-control-attribution { font-size:9px!important; }
-            .leaflet-container { font-family:Arial,sans-serif; }
-          </style>
-        </head>
-        <body>
-          <div id="map"></div>
-          <div class="panel">
-            <div id="status">Завантаження карти та радарних даних…</div>
-            <div class="controls">
-              <button id="prev" onclick="stepFrame(-1)" disabled>‹</button>
-              <button id="play" onclick="togglePlay()" disabled>▶</button>
-              <button id="next" onclick="stepFrame(1)" disabled>›</button>
-              <button id="refresh" onclick="reloadRadar()">↻</button>
-            </div>
-            <div id="credit">Карта © OpenStreetMap · Радар © RainViewer</div>
-          </div>
-          <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
-            onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';"></script>
-          <script>
-            (function() {
-              var statusEl = document.getElementById('status');
-              var playButton = document.getElementById('play');
-              var prevButton = document.getElementById('prev');
-              var nextButton = document.getElementById('next');
-              var map = null;
-              var frames = [];
-              var frameIndex = 0;
-              var radarLayer = null;
-              var playTimer = null;
-              var radarHost = '';
-
-              function setStatus(message) { statusEl.textContent = message; }
-              function setControls(enabled) {
-                playButton.disabled = !enabled;
-                prevButton.disabled = !enabled;
-                nextButton.disabled = !enabled;
-              }
-              function stopPlayback() {
-                if (playTimer !== null) window.clearInterval(playTimer);
-                playTimer = null;
-                playButton.textContent = '▶';
-              }
-              function formatTime(timestamp) {
-                return new Date(timestamp * 1000).toLocaleString('uk-UA', {
-                  day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
-                });
-              }
-              function showFrame(index) {
-                if (!frames.length || !map) return;
-                frameIndex = (index + frames.length) % frames.length;
-                var frame = frames[frameIndex];
-                if (radarLayer) map.removeLayer(radarLayer);
-
-                // Шлях беремо безпосередньо з API: він може бути хешем, а не timestamp.
-                var tileUrl = radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
-                var tileErrors = 0;
-                radarLayer = L.tileLayer(tileUrl, {
-                  tileSize:256,
-                  minZoom:2,
-                  maxNativeZoom:7,
-                  maxZoom:12,
-                  opacity:0.82,
-                  updateWhenIdle:true,
-                  keepBuffer:2,
-                  attribution:'Weather data © RainViewer'
-                });
-                radarLayer.on('tileerror', function() {
-                  tileErrors++;
-                  if (tileErrors >= 3) {
-                    setStatus('Радарні зображення наразі недоступні в цій області.');
-                  }
-                });
-                radarLayer.addTo(map);
-                setStatus('Радар: ' + formatTime(frame.time) + ' · кадр ' + (frameIndex + 1) + ' із ' + frames.length);
-              }
-              window.stepFrame = function(direction) {
-                if (!frames.length) return;
-                stopPlayback();
-                showFrame(frameIndex + direction);
-              };
-              window.togglePlay = function() {
-                if (playTimer !== null) { stopPlayback(); return; }
-                if (frames.length < 2) return;
-                playButton.textContent = 'Ⅱ';
-                playTimer = window.setInterval(function() {
-                  showFrame(frameIndex + 1);
-                }, 850);
-              };
-              window.reloadRadar = function() {
-                stopPlayback();
-                loadRadarFrames();
-              };
-
-              function initMap() {
-                if (typeof L === 'undefined') {
-                  setStatus('Не завантажилася бібліотека карти. Перевір інтернет або доступ до CDN Leaflet.');
-                  return false;
+            // Lifecycle.addObserver immediately dispatches the owner's current state,
+            // so do not manually call onStart/onResume here a second time.
+            owner.lifecycle.addObserver(observer)
+            onDispose {
+                owner.lifecycle.removeObserver(observer)
+                if (!view.isDestroyed) {
+                    if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onPause()
+                    if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStop()
+                    view.onDestroy()
                 }
-                try {
-                  map = L.map('map', { zoomControl:true, maxZoom:12, preferCanvas:true })
-                    .setView([$latitude, $longitude], 6);
-                  window.lmpRadarMap = map;
-                  var baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    minZoom:2, maxZoom:19, attribution:'© OpenStreetMap contributors',
-                    crossOrigin:true
-                  }).addTo(map);
-                  baseLayer.on('tileerror', function() {
-                    setStatus('Не вдалося завантажити фрагменти базової карти. Перевір інтернет-з’єднання.');
-                  });
-                  map.whenReady(function() {
-                    window.setTimeout(function() { map.invalidateSize(true); }, 250);
-                    window.setTimeout(function() { map.invalidateSize(true); }, 1000);
-                  });
-                  window.addEventListener('resize', function() {
-                    if (map) window.setTimeout(function() { map.invalidateSize(true); }, 150);
-                  });
-                  return true;
-                } catch (error) {
-                  setStatus('Помилка ініціалізації карти: ' + error.message);
-                  return false;
-                }
-              }
+                mapView = null
+                mapLibreMap = null
+                mapStyle = null
+            }
+        }
+    }
 
-              function loadRadarFrames() {
-                setControls(false);
-                setStatus('Завантаження радарних кадрів…');
-                fetch('https://api.rainviewer.com/public/weather-maps.json', { cache:'no-store' })
-                  .then(function(response) {
-                    if (!response.ok) throw new Error('RainViewer HTTP ' + response.status);
-                    return response.json();
-                  })
-                  .then(function(data) {
-                    if (!data.host || !data.radar || !Array.isArray(data.radar.past)) {
-                      throw new Error('Сервер повернув дані невідомого формату');
-                    }
-                    radarHost = data.host;
-                    frames = data.radar.past.filter(function(frame) {
-                      return frame && typeof frame.path === 'string' && frame.path.length > 0 && Number(frame.time) > 0;
-                    }).sort(function(a, b) { return a.time - b.time; });
-                    if (!frames.length) throw new Error('Наразі немає доступних радарних кадрів');
-                    setControls(true);
-                    showFrame(frames.length - 1);
-                  })
-                  .catch(function(error) {
-                    setControls(false);
-                    setStatus('Не вдалося отримати радар: ' + (error.message || 'невідома помилка') + '. Натисни ↻ для повтору.');
-                  });
-              }
+    // Load radar metadata after the native map style is ready.
+    LaunchedEffect(mapStyle, refreshToken) {
+        val style = mapStyle ?: return@LaunchedEffect
+        status = "Завантаження радарних даних…"
+        try {
+            val response = fetchRainViewerFrames()
+            radarHost = response.host
+            radarFrames = response.frames
+            currentFrameIndex = response.frames.lastIndex
+            status = "Карта готова · отримано ${response.frames.size} радарних кадрів"
+        } catch (error: Exception) {
+            status = "Карта готова, але радар недоступний: ${error.message ?: "помилка мережі"}"
+        }
+    }
 
-              if (initMap()) loadRadarFrames();
-            })();
-          </script>
-        </body>
-        </html>
-        """.trimIndent()
+    // Update only the raster overlay when the selected frame changes.
+    LaunchedEffect(mapStyle, radarHost, radarFrames, currentFrameIndex) {
+        val style = mapStyle ?: return@LaunchedEffect
+        val frame = radarFrames.getOrNull(currentFrameIndex) ?: return@LaunchedEffect
+        try {
+            applyRainViewerFrame(style, radarHost, frame)
+            val time = SimpleDateFormat("HH:mm", Locale("uk", "UA")).format(Date(frame.time * 1000L))
+            status = "Радар: $time · ${currentFrameIndex + 1}/${radarFrames.size}"
+        } catch (error: Exception) {
+            status = "Не вдалося показати радар: ${error.message ?: "помилка шару"}"
+        }
+    }
+
+    // Animate the 10-minute archive frames. RainViewer's public API provides past frames only.
+    LaunchedEffect(isPlaying, radarFrames.size) {
+        if (isPlaying && radarFrames.size > 1) {
+            while (true) {
+                delay(900)
+                currentFrameIndex = (currentFrameIndex + 1) % radarFrames.size
+            }
+        }
     }
 
     Column(
@@ -2187,97 +2192,96 @@ private fun RadarScreen(
             TextButton(onClick = onBack) {
                 Text("‹  Назад", color = cream, fontSize = 16.sp)
             }
-            Column(
-                Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "Метеорадар",
-                    color = cream,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium
-                )
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Метеорадар", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
                 Text(cityName, color = mutedWhite, fontSize = 12.sp)
+            }
+            TextButton(onClick = { refreshToken++ }) {
+                Text("↻", color = cream, fontSize = 22.sp)
             }
         }
 
-        AndroidView(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            factory = {
-                WebView(context).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.loadsImagesAutomatically = true
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    settings.allowFileAccess = false
-                    settings.javaScriptCanOpenWindowsAutomatically = false
-                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                    settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                    setBackgroundColor(android.graphics.Color.rgb(7, 62, 80))
-                    webChromeClient = object : android.webkit.WebChromeClient() {
-                        override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
-                            android.util.Log.e(
-                                "LMP_RADAR",
-                                "${message.message()} -- line ${message.lineNumber()}"
-                            )
-                            return true
-                        }
-                    }
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
-                            super.onPageStarted(view, url, favicon)
-                            android.util.Log.d("LMP_RADAR", "Page started: $url")
-                        }
-
-                        override fun onPageFinished(view: WebView, url: String) {
-                            super.onPageFinished(view, url)
-                            android.util.Log.d("LMP_RADAR", "Page finished: $url")
-                            view.evaluateJavascript(
-                                "if (window.lmpRadarMap) { window.lmpRadarMap.invalidateSize(true); }",
-                                null
-                            )
-                        }
-
-                        override fun onReceivedError(
-                            view: WebView,
-                            request: android.webkit.WebResourceRequest,
-                            error: android.webkit.WebResourceError
-                        ) {
-                            if (request.isForMainFrame) {
-                                android.util.Log.e(
-                                    "LMP_RADAR",
-                                    "Main frame error: ${error.description}"
-                                )
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { viewContext ->
+                    MapLibre.getInstance(viewContext.applicationContext)
+                    MapView(viewContext).apply {
+                        onCreate(null)
+                        mapView = this
+                        getMapAsync { nativeMap ->
+                            mapLibreMap = nativeMap
+                            nativeMap.cameraPosition = CameraPosition.Builder()
+                                .target(LatLng(latitude, longitude))
+                                .zoom(6.5)
+                                .build()
+                            nativeMap.uiSettings.apply {
+                                isCompassEnabled = true
+                                isRotateGesturesEnabled = true
+                                isTiltGesturesEnabled = false
+                                isZoomGesturesEnabled = true
+                                isScrollGesturesEnabled = true
+                            }
+                            status = "Завантаження базової карти…"
+                            nativeMap.setStyle(Style.Builder().fromJson(createLmpBaseMapStyle())) { loadedStyle ->
+                                mapStyle = loadedStyle
+                                status = "Базова карта завантажена"
                             }
                         }
-
-                        override fun onReceivedHttpError(
-                            view: WebView,
-                            request: android.webkit.WebResourceRequest,
-                            errorResponse: android.webkit.WebResourceResponse
-                        ) {
-                            android.util.Log.e(
-                                "LMP_RADAR",
-                                "HTTP ${errorResponse.statusCode}: ${request.url}"
-                            )
-                        }
                     }
+                }
+            )
 
-                    // Завантажуємо HTML безпосередньо у factory, як у тесті WebView,
-                    // який успішно відобразив HTML. update() навмисно відсутній:
-                    // сторінка не має повторно завантажуватися після створення View.
-                    loadDataWithBaseURL(
-                        "https://www.rainviewer.com/",
-                        html,
-                        "text/html",
-                        "UTF-8",
-                        null
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xF2042D3B))
+                    .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 14.dp, vertical = 11.dp)
+            ) {
+                Text(status, color = cream, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                if (radarFrames.isNotEmpty()) {
+                    Slider(
+                        value = currentFrameIndex.toFloat(),
+                        onValueChange = { currentFrameIndex = it.toInt().coerceIn(0, radarFrames.lastIndex) },
+                        valueRange = 0f..radarFrames.lastIndex.toFloat(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = {
+                            isPlaying = false
+                            currentFrameIndex = (currentFrameIndex - 1).coerceAtLeast(0)
+                        }) { Text("‹", color = cream, fontSize = 24.sp) }
+                        TextButton(onClick = { isPlaying = !isPlaying }) {
+                            Text(if (isPlaying) "Ⅱ Пауза" else "▶ Відтворити", color = cream)
+                        }
+                        TextButton(onClick = {
+                            isPlaying = false
+                            currentFrameIndex = (currentFrameIndex + 1).coerceAtMost(radarFrames.lastIndex)
+                        }) { Text("›", color = cream, fontSize = 24.sp) }
+                    }
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().padding(top = 9.dp),
+                        color = Color(0xFF8DE3D7),
+                        trackColor = Color.White.copy(alpha = 0.15f)
                     )
                 }
+                Text(
+                    "© OpenStreetMap contributors · Weather data © RainViewer",
+                    color = mutedWhite.copy(alpha = 0.8f),
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp)
+                )
             }
-        )
+        }
     }
 }
