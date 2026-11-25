@@ -1989,201 +1989,106 @@ private fun RadarScreen(
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val html = remember(latitude, longitude) {
+
+    // Тимчасова тестова сторінка. Вона не використовує інтернет,
+    // Leaflet або RainViewer. Перевіряємо лише відображення WebView.
+    val testHtml = remember {
         """
         <!DOCTYPE html>
-        <html>
+        <html lang="uk">
         <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-          <style>
-            html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; background:#0b5266; }
-            #map { position:absolute; inset:0; width:100%; height:100%; background:#0b5266; }
-            .panel {
-              position:absolute; z-index:1000; left:12px; right:12px; bottom:18px;
-              padding:12px 14px; border-radius:18px; color:#f3fffd;
-              background:rgba(4,45,59,.92); border:1px solid rgba(210,255,249,.45);
-              font-family:Arial,sans-serif; box-shadow:0 4px 18px rgba(0,0,0,.28);
-            }
-            .controls { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:8px; }
-            button { min-width:48px; border:1px solid rgba(220,255,250,.55); border-radius:12px;
-              padding:9px 15px; color:white; background:rgba(24,145,151,.85); font-size:18px; }
-            #time { text-align:center; font-size:13px; min-height:18px; }
-            #credit { text-align:center; font-size:10px; opacity:.75; margin-top:6px; }
-            .leaflet-control-attribution { font-size:9px!important; }
-          </style>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                html, body {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    padding: 0;
+                    background: #063B4A;
+                    color: #FFF8EF;
+                    font-family: Arial, sans-serif;
+                }
+                body {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    text-align: center;
+                }
+                .content {
+                    padding: 28px;
+                }
+                h1 {
+                    font-size: 28px;
+                    font-weight: 600;
+                    margin-bottom: 14px;
+                }
+                p {
+                    font-size: 17px;
+                    line-height: 1.5;
+                    color: rgba(255,255,255,0.82);
+                }
+            </style>
         </head>
         <body>
-          <div id="map"></div>
-          <div class="panel">
-            <div id="time">Завантаження карти…</div>
-            <div class="controls">
-              <button onclick="step(-1)">‹</button>
-              <button id="play" onclick="togglePlay()">▶</button>
-              <button onclick="step(1)">›</button>
+            <div class="content">
+                <h1>WEBVIEW ПРАЦЮЄ</h1>
+                <p>Тестова сторінка LMP Clock &amp; Weather</p>
+                <p>Якщо ти бачиш цей текст, WebView відображає HTML.</p>
             </div>
-            <div id="credit">Карта © OpenStreetMap · Радар © RainViewer</div>
-          </div>
-          <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-          <script>
-            (function() {
-              const status = document.getElementById('time');
-              let map = null, frames = [], pos = 0, radar = null, timer = null;
-              function reportError(message) { status.textContent = 'Помилка: ' + message; }
-
-              function initMap() {
-                if (typeof L === 'undefined') {
-                  reportError('не завантажилася бібліотека карти. Перевір інтернет-з’єднання.');
-                  return false;
-                }
-                try {
-                  map = L.map('map', { zoomControl:true, maxZoom:12, preferCanvas:true })
-                    .setView([$latitude, $longitude], 6);
-                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom:19,
-                    attribution:'© OpenStreetMap contributors'
-                  }).addTo(map);
-                  map.whenReady(function() {
-                    setTimeout(function() { map.invalidateSize(true); }, 250);
-                    setTimeout(function() { map.invalidateSize(true); }, 1000);
-                  });
-                  window.addEventListener('resize', function() {
-                    if (map) setTimeout(function() { map.invalidateSize(true); }, 150);
-                  });
-                  return true;
-                } catch (e) {
-                  reportError('не вдалося створити карту: ' + e.message);
-                  return false;
-                }
-              }
-
-              function timeLabel(ts) {
-                return new Date(ts*1000).toLocaleString('uk-UA', {
-                  hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'
-                });
-              }
-              function showFrame(i) {
-                if (!frames.length || !map) return;
-                pos = (i + frames.length) % frames.length;
-                const frame = frames[pos];
-                if (radar) map.removeLayer(radar);
-
-                const url = window.radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
-                radar = L.tileLayer(url, {
-                  tileSize:256, maxNativeZoom:7, maxZoom:12,
-                  opacity:0.82, attribution:'Weather data © RainViewer'
-                });
-                radar.on('tileerror', function() {
-                  status.textContent = 'Карта працює, але радарний шар недоступний для цього кадру.';
-                });
-                radar.addTo(map);
-                status.textContent = 'Радар: ' + timeLabel(frame.time) + ' · ' + (pos+1) + '/' + frames.length;
-              }
-              function stop() {
-                if (timer) clearInterval(timer);
-                timer = null;
-                document.getElementById('play').textContent = '▶';
-              }
-              window.step = function(direction) {
-                stop();
-                showFrame(pos + direction);
-              };
-              window.togglePlay = function() {
-                if (timer) { stop(); return; }
-                if (frames.length < 2) return;
-                document.getElementById('play').textContent = 'Ⅱ';
-                timer = setInterval(function() { showFrame(pos + 1); }, 800);
-              };
-
-              if (!initMap()) return;
-
-              fetch('https://api.rainviewer.com/public/weather-maps.json', { cache:'no-store' })
-                .then(function(response) {
-                  if (!response.ok) throw new Error('RainViewer HTTP ' + response.status);
-                  return response.json();
-                })
-                .then(function(data) {
-                  if (!data.host || !data.radar || !Array.isArray(data.radar.past)) {
-                    throw new Error('невірна відповідь сервера');
-                  }
-                  window.radarHost = data.host;
-                  frames = data.radar.past.filter(function(frame) {
-                    return frame && frame.path && frame.time;
-                  });
-                  if (!frames.length) throw new Error('немає доступних радарних кадрів');
-                  showFrame(frames.length - 1);
-                })
-                .catch(function(error) {
-                  reportError(error.message || 'не вдалося отримати дані');
-                });
-            })();
-          </script>
         </body>
         </html>
         """.trimIndent()
     }
 
     Column(
-        Modifier.fillMaxSize()
+        Modifier
+            .fillMaxSize()
             .background(Color(0xFF063B4A))
             .navigationBarsPadding()
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onBack) {
                 Text("‹  Назад", color = cream, fontSize = 16.sp)
             }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Метеорадар", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+            Column(
+                Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Тест WebView",
+                    color = cream,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium
+                )
                 Text(cityName, color = mutedWhite, fontSize = 12.sp)
             }
         }
+
         AndroidView(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
             factory = {
                 WebView(context).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
+                    settings.javaScriptEnabled = false
+                    settings.domStorageEnabled = false
                     settings.loadsImagesAutomatically = true
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                    setBackgroundColor(android.graphics.Color.rgb(7, 62, 80))
-                    webChromeClient = object : android.webkit.WebChromeClient() {
-                        override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
-                            android.util.Log.e("LMP_RADAR", "${message.message()} -- line ${message.lineNumber()}")
-                            return true
-                        }
-                    }
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView, url: String) {
-                            super.onPageFinished(view, url)
-                            view.evaluateJavascript(
-                                "if (window.L && window.map) { window.map.invalidateSize(true); }",
-                                null
-                            )
-                        }
+                    setBackgroundColor(android.graphics.Color.rgb(6, 59, 74))
+                    webViewClient = WebViewClient()
 
-                        override fun onReceivedError(
-                            view: WebView,
-                            request: android.webkit.WebResourceRequest,
-                            error: android.webkit.WebResourceError
-                        ) {
-                            if (request.isForMainFrame) {
-                                android.util.Log.e("LMP_RADAR", "WebView error: ${error.description}")
-                            }
-                        }
-                    }
-                    loadUrl("https://www.openstreetmap.org")
-                }
-            },
-            update = { view ->
-                if (view.tag != html) {
-                    view.tag = html
-                    view.loadDataWithBaseURL("https://www.rainviewer.com/", html, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL(
+                        null,
+                        testHtml,
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
                 }
             }
         )
