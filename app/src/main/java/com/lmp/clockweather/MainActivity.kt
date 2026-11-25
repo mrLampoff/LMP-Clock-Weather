@@ -1999,7 +1999,7 @@ private fun RadarScreen(
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';">
           <style>
             html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; background:#0b5266; }
             #map { position:absolute; inset:0; width:100%; height:100%; background:#0b5266; }
@@ -2031,7 +2031,8 @@ private fun RadarScreen(
             </div>
             <div id="credit">Карта © OpenStreetMap · Радар © RainViewer</div>
           </div>
-          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+            onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';"></script>
           <script>
             (function() {
               var statusEl = document.getElementById('status');
@@ -2109,7 +2110,7 @@ private fun RadarScreen(
 
               function initMap() {
                 if (typeof L === 'undefined') {
-                  setStatus('Не завантажилася бібліотека карти. Перевір інтернет або доступ до unpkg.com.');
+                  setStatus('Не завантажилася бібліотека карти. Перевір інтернет або доступ до CDN Leaflet.');
                   return false;
                 }
                 try {
@@ -2214,6 +2215,7 @@ private fun RadarScreen(
                     settings.allowFileAccess = false
                     settings.javaScriptCanOpenWindowsAutomatically = false
                     settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                     setBackgroundColor(android.graphics.Color.rgb(7, 62, 80))
                     webChromeClient = object : android.webkit.WebChromeClient() {
                         override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
@@ -2257,20 +2259,16 @@ private fun RadarScreen(
                             )
                         }
                     }
-                    loadDataWithBaseURL(
-                        "https://www.rainviewer.com/",
-                        html,
-                        "text/html",
-                        "UTF-8",
-                        null
-                    )
+                    // HTML завантажується лише в update(), щоб уникнути подвійного старту WebView.
                 }
             },
             update = { view ->
+                // AndroidView викликає update одразу після factory. Позначаємо HTML,
+                // щоб кожна версія сторінки завантажувалася рівно один раз.
                 if (view.tag != html) {
                     view.tag = html
                     view.loadDataWithBaseURL(
-                        "https://www.rainviewer.com/",
+                        "https://appassets.androidplatform.net/",
                         html,
                         "text/html",
                         "UTF-8",
