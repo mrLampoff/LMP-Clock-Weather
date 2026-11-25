@@ -2227,8 +2227,14 @@ private fun RadarScreen(
                         }
                     }
                     webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            android.util.Log.d("LMP_RADAR", "Page started: $url")
+                        }
+
                         override fun onPageFinished(view: WebView, url: String) {
                             super.onPageFinished(view, url)
+                            android.util.Log.d("LMP_RADAR", "Page finished: $url")
                             view.evaluateJavascript(
                                 "if (window.lmpRadarMap) { window.lmpRadarMap.invalidateSize(true); }",
                                 null
@@ -2259,16 +2265,12 @@ private fun RadarScreen(
                             )
                         }
                     }
-                    // HTML завантажується лише в update(), щоб уникнути подвійного старту WebView.
-                }
-            },
-            update = { view ->
-                // AndroidView викликає update одразу після factory. Позначаємо HTML,
-                // щоб кожна версія сторінки завантажувалася рівно один раз.
-                if (view.tag != html) {
-                    view.tag = html
-                    view.loadDataWithBaseURL(
-                        "https://appassets.androidplatform.net/",
+
+                    // Завантажуємо HTML безпосередньо у factory, як у тесті WebView,
+                    // який успішно відобразив HTML. update() навмисно відсутній:
+                    // сторінка не має повторно завантажуватися після створення View.
+                    loadDataWithBaseURL(
+                        "https://www.rainviewer.com/",
                         html,
                         "text/html",
                         "UTF-8",
