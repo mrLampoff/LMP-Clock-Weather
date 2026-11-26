@@ -305,21 +305,20 @@ class WidgetWeatherWorker(
                 val current = json.getJSONObject("current")
                 val daily = json.getJSONObject("daily")
 
-                val temp = current
-                    .getDouble("temperature_2m")
-                    .toInt()
+                val useCelsius = TemperatureUnits.isCelsius(applicationContext)
+                val temp = TemperatureUnits.format(
+                    current.getDouble("temperature_2m").toInt(), useCelsius
+                )
 
                 val code = current.getInt("weather_code")
 
-                val high = daily
-                    .getJSONArray("temperature_2m_max")
-                    .getDouble(0)
-                    .toInt()
+                val high = TemperatureUnits.format(
+                    daily.getJSONArray("temperature_2m_max").getDouble(0).toInt(), useCelsius
+                )
 
-                val low = daily
-                    .getJSONArray("temperature_2m_min")
-                    .getDouble(0)
-                    .toInt()
+                val low = TemperatureUnits.format(
+                    daily.getJSONArray("temperature_2m_min").getDouble(0).toInt(), useCelsius
+                )
 
                 val icon = when (code) {
                     0 -> "☀️"
@@ -360,9 +359,9 @@ class WidgetWeatherWorker(
                     updateWidgetFromWorker(
                         id,
                         description,
-                        "$temp°",
+                        "$temp${if (useCelsius) "°C" else "°F"}",
                         icon,
-                        "Макс. $high°  ·  Мін. $low°",
+                        "Макс. $high°${if (useCelsius) "C" else "F"}  ·  Мін. $low°${if (useCelsius) "C" else "F"}",
                         savedLocation.city
                     )
                 }

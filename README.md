@@ -27,3 +27,12 @@
 - Погодні значки замінені на Flat Design графіку.
 - Додана окрема іконка застосунку без тексту.
 - Додано нижній системний відступ на головному екрані, щоб підписи не перекривалися навігаційною панеллю Android.
+
+## Version 1.14 audit fixes
+
+- Removed the hard-coded 10 km Desna geolocation override. City names now come from reverse geocoding in both the foreground app and background location service.
+- Added `TemperatureUnits` as the shared source for the persisted `use_celsius` preference and Celsius/Fahrenheit conversion.
+- Widget temperatures, daily high/low and foreground-service notification temperatures (including hourly forecast) now follow the same °C/°F preference.
+- Changing the temperature preference immediately queues a widget refresh and asks the running weather service to rebuild its notification.
+- Corrected the Android manifest label XML escaping in the source file and changed CI to validate the manifest rather than patching it during builds.
+- Version bumped to 1.14 (versionCode 3).

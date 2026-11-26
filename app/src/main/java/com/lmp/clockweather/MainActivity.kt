@@ -535,6 +535,14 @@ fun LmpWeatherApp() {
             onCelsiusChange = {
                 useCelsius = it
                 settingsPreferences.edit().putBoolean("use_celsius", it).apply()
+                androidx.work.WorkManager.getInstance(context).enqueue(
+                    androidx.work.OneTimeWorkRequestBuilder<WidgetWeatherWorker>().build()
+                )
+                context.startService(
+                    Intent(context, WeatherLocationService::class.java).apply {
+                        action = WeatherLocationService.ACTION_REFRESH_UNITS
+                    }
+                )
             },
             onBack = {
                 showSettings = false
@@ -1971,26 +1979,6 @@ private fun getCityName(
     latitude: Double,
     longitude: Double
 ): String {
-
-    // Координати центру Десни
-    val desnaLatitude = 50.9311535
-    val desnaLongitude = 30.75695
-
-    // Перевірка відстані до Десни
-    val results = FloatArray(1)
-
-    Location.distanceBetween(
-        latitude,
-        longitude,
-        desnaLatitude,
-        desnaLongitude,
-        results
-    )
-
-    // Якщо відстань не більше 10 км — показуємо Десна
-    if (results[0] <= 10000f) {
-        return "Десна"
-    }
 
     // В інших місцях визначаємо назву автоматично
     return try {

@@ -12,8 +12,8 @@ android {
         applicationId = "com.lmp.clockweather"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.13"
+        versionCode = 3
+        versionName = "1.14"
     }
 
     buildFeatures { compose = true }

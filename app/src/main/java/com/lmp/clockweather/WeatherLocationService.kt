@@ -41,6 +41,7 @@ class WeatherLocationService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.lmp.clockweather.STOP_WEATHER_SERVICE"
+        const val ACTION_REFRESH_UNITS = "com.lmp.clockweather.REFRESH_TEMPERATURE_UNITS"
         private const val CHANNEL_ID = "lmp_weather_channel"
         private const val NOTIFICATION_ID = 1001
         private const val UPDATE_INTERVAL = 30 * 60 * 1000L
@@ -53,9 +54,10 @@ class WeatherLocationService : Service() {
     private var lastWeatherRequestAt = 0L
     private var lastWeatherLocation: Location? = null
     private var currentCity = "Визначаємо місто…"
-    private var currentTemperature = "--°"
-    private var currentHigh = "--°"
-    private var currentLow = "--°"
+    // Values are kept in Celsius; presentation is converted at render time.
+    private var currentTemperatureC = Int.MIN_VALUE
+    private var currentHighC = Int.MIN_VALUE
+    private var currentLowC = Int.MIN_VALUE
     private var hourlyForecast: List<NotificationHour> = emptyList()
 
     private val listener = object : LocationListener {
@@ -82,6 +84,10 @@ class WeatherLocationService : Service() {
         if (intent?.action == ACTION_STOP) {
             stopTracking()
             return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_REFRESH_UNITS) {
+            updateNotification()
+            return START_STICKY
         }
 
         startForeground(NOTIFICATION_ID, buildNotification())
@@ -179,42 +185,19 @@ class WeatherLocationService : Service() {
 
         weatherExecutor.execute {
             try {
-               val city = try {
-    // Координати центру Десни
-    val desnaLatitude = 50.9311535
-    val desnaLongitude = 30.75695
-
-    // Перевіряємо відстань до Десни
-    val results = FloatArray(1)
-
-    Location.distanceBetween(
-        location.latitude,
-        location.longitude,
-        desnaLatitude,
-        desnaLongitude,
-        results
-    )
-
-    if (results[0] <= 10000f) {
-        "Десна"
-    } else {
-        val geocoder = Geocoder(this, Locale("uk", "UA"))
-
-        @Suppress("DEPRECATION")
-        val address = geocoder.getFromLocation(
-            location.latitude,
-            location.longitude,
-            5
-        )?.firstOrNull()
-
-        address?.locality
-            ?: address?.subAdminArea
-            ?: address?.adminArea
-            ?: "Моє місцезнаходження"
-    }
-} catch (_: Exception) {
-    "Моє місцезнаходження"
-}
+                val city = try {
+                    val geocoder = Geocoder(this, Locale("uk", "UA"))
+                    @Suppress("DEPRECATION")
+                    val address = geocoder.getFromLocation(
+                        location.latitude, location.longitude, 5
+                    )?.firstOrNull()
+                    address?.locality
+                        ?: address?.subAdminArea
+                        ?: address?.adminArea
+                        ?: "Моє місцезнаходження"
+                } catch (_: Exception) {
+                    "Моє місцезнаходження"
+                }
 
                 val endpoint =
                     "https://api.open-meteo.com/v1/forecast" +
@@ -279,9 +262,9 @@ class WeatherLocationService : Service() {
 
                 handler.post {
                     currentCity = city
-                    currentTemperature = "${temp}°"
-                    currentHigh = "${high}°"
-                    currentLow = "${low}°"
+                    currentTemperatureC = temp
+                    currentHighC = high
+                    currentLowC = low
                     hourlyForecast = nextHours
                     updateNotification()
                 }
@@ -331,7 +314,17 @@ class WeatherLocationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val content = message ?: "$currentTemperature · $currentCity · Мін. $currentLow · Макс. $currentHigh"
+        val useCelsius = TemperatureUnits.isCelsius(this)
+        fun displayTemp(value: Int): String =
+            if (value == Int.MIN_VALUE) "--°" else "${TemperatureUnits.format(value, useCelsius)}°"
+        val unitSuffix = if (useCelsius) "C" else "F"
+        val currentTemperature = displayTemp(currentTemperatureC)
+        val currentHigh = displayTemp(currentHighC)
+        val currentLow = displayTemp(currentLowC)
+        val currentTemperatureWithUnit = "$currentTemperature$unitSuffix"
+        val currentHighWithUnit = "$currentHigh$unitSuffix"
+        val currentLowWithUnit = "$currentLow$unitSuffix"
+        val content = message ?: "$currentTemperatureWithUnit · $currentCity · Мін. $currentLowWithUnit · Макс. $currentHighWithUnit"
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -342,8 +335,8 @@ class WeatherLocationService : Service() {
 
         val expandedView = RemoteViews(packageName, R.layout.weather_notification_expanded).apply {
             setTextViewText(R.id.notification_city, "LMP Weather · $currentCity")
-            setTextViewText(R.id.notification_current, currentTemperature)
-            setTextViewText(R.id.notification_daily, "Мін. $currentLow   ·   Макс. $currentHigh")
+            setTextViewText(R.id.notification_current, currentTemperatureWithUnit)
+            setTextViewText(R.id.notification_daily, "Мін. $currentLowWithUnit   ·   Макс. $currentHighWithUnit")
             setTextViewText(R.id.notification_forecast_label, "ПОГОДИННИЙ ПРОГНОЗ")
 
             val timeIds = intArrayOf(
@@ -369,7 +362,10 @@ class WeatherLocationService : Service() {
                     setTextViewText(timeIds[index], hour.time)
                     setTextViewText(rainIds[index], "${hour.precipitation}%")
                     setTextViewText(iconIds[index], weatherEmoji(hour.weatherCode))
-                    setTextViewText(tempIds[index], "${hour.temperature}°")
+                    setTextViewText(
+                        tempIds[index],
+                        "${TemperatureUnits.format(hour.temperature, useCelsius)}°$unitSuffix"
+                    )
                 } else {
                     setTextViewText(timeIds[index], "—")
                     setTextViewText(rainIds[index], "")
@@ -410,7 +406,8 @@ class WeatherLocationService : Service() {
         // The OS still controls the final displayed icon bounds.
         val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val label = currentTemperature
+        val label = if (currentTemperatureC == Int.MIN_VALUE) "--°" else
+            "${TemperatureUnits.format(this, currentTemperatureC)}°"
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
