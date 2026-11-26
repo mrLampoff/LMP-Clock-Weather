@@ -28,7 +28,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
-import kotlin.concurrent.thread
+import java.util.concurrent.Executors
 
 private data class NotificationHour(
     val time: String,
@@ -48,6 +48,10 @@ class WeatherLocationService : Service() {
 
     private lateinit var locationManager: LocationManager
     private val handler = Handler(Looper.getMainLooper())
+    private val weatherExecutor = Executors.newSingleThreadExecutor()
+    private val updateLock = Any()
+    private var lastWeatherRequestAt = 0L
+    private var lastWeatherLocation: Location? = null
     private var currentCity = "Визначаємо місто…"
     private var currentTemperature = "--°"
     private var currentHigh = "--°"
@@ -86,6 +90,11 @@ class WeatherLocationService : Service() {
     }
 
     private fun startTracking() {
+        try {
+            locationManager.removeUpdates(listener)
+        } catch (_: Exception) {
+        }
+
         if (!hasLocationPermission()) {
             updateNotification("Немає дозволу на геолокацію")
             stopSelf()
@@ -155,7 +164,20 @@ class WeatherLocationService : Service() {
     }
 
     private fun updateWeather(location: Location) {
-        thread {
+        // Ignore duplicate fixes from GPS/network providers arriving together.
+        // A 1 km movement or a 10-minute interval is enough to allow a new fetch.
+        val now = System.currentTimeMillis()
+        synchronized(updateLock) {
+            val previous = lastWeatherLocation
+            val distanceMeters = previous?.distanceTo(location) ?: Float.MAX_VALUE
+            if (now - lastWeatherRequestAt < 10 * 60 * 1000L && distanceMeters < 1000f) {
+                return
+            }
+            lastWeatherRequestAt = now
+            lastWeatherLocation = Location(location)
+        }
+
+        weatherExecutor.execute {
             try {
                val city = try {
     // Координати центру Десни
@@ -173,7 +195,7 @@ class WeatherLocationService : Service() {
         results
     )
 
-    if (results[0] <= 2000f) {
+    if (results[0] <= 10000f) {
         "Десна"
     } else {
         val geocoder = Geocoder(this, Locale("uk", "UA"))
@@ -211,6 +233,10 @@ class WeatherLocationService : Service() {
                     }
 
                 val json = try {
+                    val responseCode = connection.responseCode
+                    if (responseCode !in 200..299) {
+                        throw java.io.IOException("Open-Meteo HTTP $responseCode")
+                    }
                     JSONObject(
                         connection.inputStream.bufferedReader().use {
                             it.readText()
@@ -437,6 +463,7 @@ class WeatherLocationService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(periodicUpdate)
+        weatherExecutor.shutdownNow()
 
         try {
             locationManager.removeUpdates(listener)
