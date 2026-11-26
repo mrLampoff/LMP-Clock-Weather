@@ -1,4 +1,3 @@
-
 package com.lmp.clockweather
 
 import android.app.PendingIntent
@@ -291,6 +290,11 @@ class WidgetWeatherWorker(
                         connectTimeout = 12000
                         readTimeout = 12000
                     }
+
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    throw java.io.IOException("Open-Meteo HTTP $responseCode")
+                }
 
                 val json = JSONObject(
                     connection.inputStream.bufferedReader().use {
