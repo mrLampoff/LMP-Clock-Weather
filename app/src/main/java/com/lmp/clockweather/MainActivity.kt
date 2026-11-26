@@ -18,7 +18,6 @@ import android.app.Activity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -30,21 +29,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import android.content.ContextWrapper
-import org.maplibre.android.MapLibre
-import org.maplibre.android.camera.CameraPosition
-import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
-import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.style.layers.RasterLayer
-import org.maplibre.android.style.sources.RasterSource
-import org.maplibre.android.style.sources.TileSet
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -252,9 +236,6 @@ fun LmpWeatherApp() {
     }
 
     var showCities by remember { mutableStateOf(false) }
-    var showRadar by remember { mutableStateOf(false) }
-    var currentLatitude by remember { mutableStateOf(50.4501) }
-    var currentLongitude by remember { mutableStateOf(30.5234) }
     var cityList by remember { mutableStateOf(savedCities(context)) }
 
     // Завантаження погоди
@@ -274,8 +255,6 @@ fun LmpWeatherApp() {
 
                 weather = result
                 locationName = city
-                currentLatitude = lat
-                currentLongitude = lon
 
             } catch (e: Exception) {
                 error = "Не вдалося отримати погоду. Перевір підключення до інтернету."
@@ -501,15 +480,7 @@ fun LmpWeatherApp() {
     }
 
     // Відображення екранів
-    if (showRadar) {
-        BackHandler { showRadar = false }
-        RadarScreen(
-            latitude = currentLatitude,
-            longitude = currentLongitude,
-            cityName = locationName,
-            onBack = { showRadar = false }
-        )
-    } else if (showSettings) {
+    if (showSettings) {
 
         SettingsScreen(
             useCelsius = useCelsius,
@@ -544,7 +515,6 @@ fun LmpWeatherApp() {
                     load(targetCity.latitude, targetCity.longitude, targetCity.name)
                 }
             },
-            onRadar = { showRadar = true },
             onRefresh = {
                 // Refresh using the last detected location instead of silently reverting to Kyiv.
                 val saved = LocationStore.get(context)
@@ -624,7 +594,6 @@ private fun Modifier.oceanGlass(
 fun MainWeatherScreen(
     weather: WeatherBundle?, loading: Boolean, error: String, locationName: String,
     useCelsius: Boolean, onSwipeCity: (Int) -> Unit,
-    onRadar: () -> Unit,
     onRefresh: () -> Unit, onSettings: () -> Unit,
     onLocation: () -> Unit
 ) {
@@ -699,12 +668,6 @@ fun MainWeatherScreen(
                 Text(locationName, color = cream, fontSize = 18.sp)
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(
-                onClick = onRadar,
-                modifier = Modifier.oceanGlass(radius = 18.dp, fillAlpha = 0.18f)
-            ) {
-                Text("◉  МЕТЕОРАДАР", color = cream, fontSize = 12.sp, letterSpacing = 1.2.sp)
-            }
             Spacer(Modifier.height(16.dp))
             if (weather != null) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
@@ -1990,298 +1953,5 @@ private fun getCityName(
 
     } catch (e: Exception) {
         "Моє місцезнаходження"
-    }
-}
-
-private data class RadarFrame(
-    val time: Long,
-    val path: String
-)
-
-private data class RadarFramesResponse(
-    val host: String,
-    val frames: List<RadarFrame>
-)
-
-private suspend fun fetchRainViewerFrames(): RadarFramesResponse = withContext(Dispatchers.IO) {
-    val connection = (URL("https://api.rainviewer.com/public/weather-maps.json").openConnection() as HttpURLConnection).apply {
-        requestMethod = "GET"
-        connectTimeout = 12000
-        readTimeout = 12000
-        setRequestProperty("Accept", "application/json")
-        setRequestProperty("User-Agent", "LMP-Clock-Weather-Android")
-    }
-    try {
-        val code = connection.responseCode
-        if (code !in 200..299) throw IllegalStateException("RainViewer HTTP $code")
-        val body = connection.inputStream.bufferedReader().use { it.readText() }
-        val root = JSONObject(body)
-        val host = root.optString("host").trimEnd('/')
-        if (host.isBlank()) throw IllegalStateException("RainViewer не повернув адресу тайлів")
-        val past = root.optJSONObject("radar")?.optJSONArray("past")
-            ?: throw IllegalStateException("RainViewer не повернув список радарних кадрів")
-        val frames = (0 until past.length()).mapNotNull { index ->
-            val item = past.optJSONObject(index) ?: return@mapNotNull null
-            val time = item.optLong("time", 0L)
-            val path = item.optString("path")
-            if (time > 0L && path.startsWith("/")) RadarFrame(time, path) else null
-        }.sortedBy { it.time }
-        if (frames.isEmpty()) throw IllegalStateException("Немає доступних радарних кадрів")
-        RadarFramesResponse(host, frames)
-    } finally {
-        connection.disconnect()
-    }
-}
-
-private fun Context.findLifecycleOwner(): LifecycleOwner? {
-    var current: Context? = this
-    while (current is ContextWrapper) {
-        if (current is LifecycleOwner) return current
-        current = current.baseContext
-    }
-    return current as? LifecycleOwner
-}
-
-private fun createLmpBaseMapStyle(): String {
-    val osmSource = JSONObject().apply {
-        put("type", "raster")
-        put("tiles", org.json.JSONArray().put("https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
-        put("tileSize", 256)
-        put("minzoom", 0)
-        put("maxzoom", 19)
-        put("attribution", "© OpenStreetMap contributors")
-    }
-    val osmLayer = JSONObject().apply {
-        put("id", "osm-base-layer")
-        put("type", "raster")
-        put("source", "osm-base")
-    }
-    return JSONObject().apply {
-        put("version", 8)
-        put("name", "LMP Clock & Weather Radar")
-        put("sources", JSONObject().put("osm-base", osmSource))
-        put("layers", org.json.JSONArray().put(osmLayer))
-    }.toString()
-}
-
-private fun applyRainViewerFrame(
-    style: Style,
-    host: String,
-    frame: RadarFrame
-) {
-    // Replace only the radar source/layer. The OSM base map and camera stay untouched.
-    runCatching { style.removeLayer("rainviewer-radar-layer") }
-    runCatching { style.removeSource("rainviewer-radar-source") }
-
-    val tileUrl = "$host${frame.path}/256/{z}/{x}/{y}/2/1_1.png"
-    val tileSet = TileSet("2.2.0", tileUrl).apply {
-        attribution = "Weather data © RainViewer"
-        setMinZoom(0f)
-        setMaxZoom(7f)
-    }
-    style.addSource(RasterSource("rainviewer-radar-source", tileSet, 256))
-    style.addLayer(
-        RasterLayer("rainviewer-radar-layer", "rainviewer-radar-source")
-            .withProperties(PropertyFactory.rasterOpacity(0.78f))
-    )
-}
-
-@Composable
-private fun RadarScreen(
-    latitude: Double,
-    longitude: Double,
-    cityName: String,
-    onBack: () -> Unit
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val lifecycleOwner = remember(context) { context.findLifecycleOwner() }
-
-    var mapView by remember { mutableStateOf<MapView?>(null) }
-    var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
-    var mapStyle by remember { mutableStateOf<Style?>(null) }
-    var radarHost by remember { mutableStateOf("") }
-    var radarFrames by remember { mutableStateOf<List<RadarFrame>>(emptyList()) }
-    var currentFrameIndex by remember { mutableIntStateOf(0) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Підготовка нативної карти…") }
-    var refreshToken by remember { mutableIntStateOf(0) }
-
-    DisposableEffect(lifecycleOwner, mapView) {
-        val view = mapView
-        val owner = lifecycleOwner
-        if (view == null || owner == null) {
-            onDispose { }
-        } else {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    androidx.lifecycle.Lifecycle.Event.ON_START -> view.onStart()
-                    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> view.onResume()
-                    androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> view.onPause()
-                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> view.onStop()
-                    androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> view.onDestroy()
-                    else -> Unit
-                }
-            }
-            // Lifecycle.addObserver immediately dispatches the owner's current state,
-            // so do not manually call onStart/onResume here a second time.
-            owner.lifecycle.addObserver(observer)
-            onDispose {
-                owner.lifecycle.removeObserver(observer)
-                if (!view.isDestroyed) {
-                    if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onPause()
-                    if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStop()
-                    view.onDestroy()
-                }
-                mapView = null
-                mapLibreMap = null
-                mapStyle = null
-            }
-        }
-    }
-
-    // Load radar metadata after the native map style is ready.
-    LaunchedEffect(mapStyle, refreshToken) {
-        val style = mapStyle ?: return@LaunchedEffect
-        status = "Завантаження радарних даних…"
-        try {
-            val response = fetchRainViewerFrames()
-            radarHost = response.host
-            radarFrames = response.frames
-            currentFrameIndex = response.frames.lastIndex
-            status = "Карта готова · отримано ${response.frames.size} радарних кадрів"
-        } catch (error: Exception) {
-            status = "Карта готова, але радар недоступний: ${error.message ?: "помилка мережі"}"
-        }
-    }
-
-    // Update only the raster overlay when the selected frame changes.
-    LaunchedEffect(mapStyle, radarHost, radarFrames, currentFrameIndex) {
-        val style = mapStyle ?: return@LaunchedEffect
-        val frame = radarFrames.getOrNull(currentFrameIndex) ?: return@LaunchedEffect
-        try {
-            applyRainViewerFrame(style, radarHost, frame)
-            val time = SimpleDateFormat("HH:mm", Locale("uk", "UA")).format(Date(frame.time * 1000L))
-            status = "Радар: $time · ${currentFrameIndex + 1}/${radarFrames.size}"
-        } catch (error: Exception) {
-            status = "Не вдалося показати радар: ${error.message ?: "помилка шару"}"
-        }
-    }
-
-    // Animate the 10-minute archive frames. RainViewer's public API provides past frames only.
-    LaunchedEffect(isPlaying, radarFrames.size) {
-        if (isPlaying && radarFrames.size > 1) {
-            while (true) {
-                delay(900)
-                currentFrameIndex = (currentFrameIndex + 1) % radarFrames.size
-            }
-        }
-    }
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0xFF063B4A))
-            .navigationBarsPadding()
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onBack) {
-                Text("‹  Назад", color = cream, fontSize = 16.sp)
-            }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Метеорадар", color = cream, fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                Text(cityName, color = mutedWhite, fontSize = 12.sp)
-            }
-            TextButton(onClick = { refreshToken++ }) {
-                Text("↻", color = cream, fontSize = 22.sp)
-            }
-        }
-
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { viewContext ->
-                    MapLibre.getInstance(viewContext.applicationContext)
-                    MapView(viewContext).apply {
-                        onCreate(null)
-                        mapView = this
-                        getMapAsync { nativeMap ->
-                            mapLibreMap = nativeMap
-                            nativeMap.cameraPosition = CameraPosition.Builder()
-                                .target(LatLng(latitude, longitude))
-                                .zoom(6.5)
-                                .build()
-                            nativeMap.uiSettings.apply {
-                                isCompassEnabled = true
-                                isRotateGesturesEnabled = true
-                                isTiltGesturesEnabled = false
-                                isZoomGesturesEnabled = true
-                                isScrollGesturesEnabled = true
-                            }
-                            status = "Завантаження базової карти…"
-                            nativeMap.setStyle(Style.Builder().fromJson(createLmpBaseMapStyle())) { loadedStyle ->
-                                mapStyle = loadedStyle
-                                status = "Базова карта завантажена"
-                            }
-                        }
-                    }
-                }
-            )
-
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xF2042D3B))
-                    .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(18.dp))
-                    .padding(horizontal = 14.dp, vertical = 11.dp)
-            ) {
-                Text(status, color = cream, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                if (radarFrames.isNotEmpty()) {
-                    Slider(
-                        value = currentFrameIndex.toFloat(),
-                        onValueChange = { currentFrameIndex = it.toInt().coerceIn(0, radarFrames.lastIndex) },
-                        valueRange = 0f..radarFrames.lastIndex.toFloat(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = {
-                            isPlaying = false
-                            currentFrameIndex = (currentFrameIndex - 1).coerceAtLeast(0)
-                        }) { Text("‹", color = cream, fontSize = 24.sp) }
-                        TextButton(onClick = { isPlaying = !isPlaying }) {
-                            Text(if (isPlaying) "Ⅱ Пауза" else "▶ Відтворити", color = cream)
-                        }
-                        TextButton(onClick = {
-                            isPlaying = false
-                            currentFrameIndex = (currentFrameIndex + 1).coerceAtMost(radarFrames.lastIndex)
-                        }) { Text("›", color = cream, fontSize = 24.sp) }
-                    }
-                } else {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth().padding(top = 9.dp),
-                        color = Color(0xFF8DE3D7),
-                        trackColor = Color.White.copy(alpha = 0.15f)
-                    )
-                }
-                Text(
-                    "© OpenStreetMap contributors · Weather data © RainViewer",
-                    color = mutedWhite.copy(alpha = 0.8f),
-                    fontSize = 9.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp)
-                )
-            }
-        }
     }
 }
