@@ -227,23 +227,35 @@ fun LmpWeatherApp() {
         mutableStateOf(false)
     }
 
+    val settingsPreferences = remember(context) {
+        context.getSharedPreferences("lmp_settings", Context.MODE_PRIVATE)
+    }
+
     var useCelsius by remember {
-        mutableStateOf(true)
+        mutableStateOf(settingsPreferences.getBoolean("use_celsius", true))
     }
 
     var locationName by remember {
         mutableStateOf("Київ")
     }
 
+    // A saved city is only a temporary view. Automatic location remains the source
+    // for the background service and the home-screen widget.
+    var temporaryCity by remember { mutableStateOf<CityOption?>(null) }
+    var latestLoadRequest by remember { mutableStateOf(0L) }
+
     var showCities by remember { mutableStateOf(false) }
     var cityList by remember { mutableStateOf(savedCities(context)) }
 
-    // Завантаження погоди
+    // Ignore stale responses when the user changes city or refreshes quickly.
     fun load(
         lat: Double = 50.4501,
         lon: Double = 30.5234,
         city: String = "Київ"
     ) {
+        val requestId = latestLoadRequest + 1L
+        latestLoadRequest = requestId
+
         scope.launch {
             loading = true
             error = ""
@@ -253,19 +265,27 @@ fun LmpWeatherApp() {
                     fetchWeather(lat, lon, city)
                 }
 
-                weather = result
-                locationName = city
+                if (requestId == latestLoadRequest) {
+                    weather = result
+                    locationName = city
+                }
 
             } catch (e: Exception) {
-                error = "Не вдалося отримати погоду. Перевір підключення до інтернету."
+                if (requestId == latestLoadRequest) {
+                    error = "Не вдалося отримати погоду. Перевір підключення до інтернету."
+                }
             } finally {
-                loading = false
+                if (requestId == latestLoadRequest) {
+                    loading = false
+                }
             }
         }
     }
 
     // Запуск фонового сервісу та завантаження погоди
     fun startServiceAndLoad() {
+        temporaryCity = null
+
         val serviceIntent = Intent(
             context,
             WeatherLocationService::class.java
@@ -310,6 +330,34 @@ fun LmpWeatherApp() {
                 }
             } else {
                 load()
+            }
+        }
+    }
+
+    // Refresh the automatic location without replacing a temporary saved-city view.
+    fun refreshAutomaticLocation() {
+        getFreshLocation(context) { freshLocation ->
+            val location = freshLocation ?: getLastKnownLocation(context)
+            if (location == null) {
+                val saved = LocationStore.get(context)
+                if (saved != null) {
+                    load(saved.latitude, saved.longitude, saved.city)
+                } else {
+                    startServiceAndLoad()
+                }
+            } else {
+                scope.launch {
+                    val city = withContext(Dispatchers.IO) {
+                        getCityName(context, location.latitude, location.longitude)
+                    }
+                    LocationStore.save(
+                        context,
+                        location.latitude,
+                        location.longitude,
+                        city
+                    )
+                    load(location.latitude, location.longitude, city)
+                }
             }
         }
     }
@@ -486,6 +534,7 @@ fun LmpWeatherApp() {
             useCelsius = useCelsius,
             onCelsiusChange = {
                 useCelsius = it
+                settingsPreferences.edit().putBoolean("use_celsius", it).apply()
             },
             onBack = {
                 showSettings = false
@@ -512,22 +561,25 @@ fun LmpWeatherApp() {
                         else -> (currentIndex + direction + cityList.size) % cityList.size
                     }
                     val targetCity = cityList[targetIndex]
+                    temporaryCity = targetCity
                     load(targetCity.latitude, targetCity.longitude, targetCity.name)
                 }
             },
             onRefresh = {
-                // Refresh using the last detected location instead of silently reverting to Kyiv.
-                val saved = LocationStore.get(context)
-                if (saved != null) {
-                    load(saved.latitude, saved.longitude, saved.city)
+                val city = temporaryCity
+                if (city != null) {
+                    // Refresh the currently previewed saved city, without changing
+                    // the automatic location used by the widget and background service.
+                    load(city.latitude, city.longitude, city.name)
                 } else {
-                    startServiceAndLoad()
+                    refreshAutomaticLocation()
                 }
             },
             onSettings = {
                 showSettings = true
             },
             onLocation = {
+                temporaryCity = null
                 ensureBackgroundAndStart()
             }
         )
@@ -546,6 +598,7 @@ fun LmpWeatherApp() {
                 storeCities(context, cityList)
             },
             onSelect = { city ->
+                temporaryCity = city
                 load(city.latitude, city.longitude, city.name)
                 showCities = false
             },
@@ -1555,7 +1608,7 @@ fun SettingsScreen(
             Text("Мої міста")
         }
         Spacer(Modifier.height(20.dp))
-        Text("Версія 1.12", color = mutedWhite)
+        Text("Версія 1.13", color = mutedWhite)
         Text("Погодні дані надає Open-Meteo", color = mutedWhite, fontSize = 12.sp)
     }
 }
@@ -1767,6 +1820,10 @@ private fun fetchWeather(lat: Double, lon: Double, city: String): WeatherBundle 
         requestMethod = "GET"; connectTimeout = 12000; readTimeout = 12000
     }
     try {
+        val responseCode = connection.responseCode
+        if (responseCode !in 200..299) {
+            throw java.io.IOException("Open-Meteo HTTP $responseCode")
+        }
         val body = connection.inputStream.bufferedReader().use { it.readText() }
         val root = JSONObject(body)
         val current = root.getJSONObject("current")
